@@ -14,11 +14,11 @@ set(SOURCES
         kernel/idt_flush.asm
         kernel/isr.asm
         kernel/idt.cpp
+        kernel/keyboard.cpp
         kernel/kernel.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
-
 target_include_directories(sabakaos.bin PRIVATE kernel)
 
 target_compile_options(sabakaos.bin PRIVATE

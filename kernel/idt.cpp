@@ -1,19 +1,20 @@
 #include "idt.h"
+#include "keyboard.h"
 
 static IDTEntry idt[256];
 static IDTPointer idt_ptr;
 
 static const char* exception_names[] = {
-    "Division By Zero",       "Debug",                  "NMI",
-    "Breakpoint",             "Overflow",               "Bound Range Exceeded",
-    "Invalid Opcode",         "Device Not Available",   "Double Fault",
-    "Coprocessor Overrun",    "Invalid TSS",            "Segment Not Present",
-    "Stack Fault",            "General Protection",     "Page Fault",
-    "Reserved",               "FPU Error",              "Alignment Check",
-    "Machine Check",          "SIMD FP Exception",      "Virtualization",
+    "Division By Zero",    "Debug",               "NMI",
+    "Breakpoint",          "Overflow",            "Bound Range Exceeded",
+    "Invalid Opcode",      "Device Not Available","Double Fault",
+    "Coprocessor Overrun", "Invalid TSS",         "Segment Not Present",
+    "Stack Fault",         "General Protection",  "Page Fault",
+    "Reserved",            "FPU Error",           "Alignment Check",
+    "Machine Check",       "SIMD FP Exception",   "Virtualization",
     "Reserved","Reserved","Reserved","Reserved","Reserved",
     "Reserved","Reserved","Reserved","Reserved",
-    "Security Exception",     "Reserved"
+    "Security Exception",  "Reserved"
 };
 
 static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags) {
@@ -25,12 +26,12 @@ static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags
 }
 
 static inline void outb(uint16_t port, uint8_t val) {
-    __asm__ volatile("outb %0, %1" :: "a"(val), "Nd"(port));
+    __asm__ volatile("outb %0,%1" :: "a"(val), "Nd"(port));
 }
 static inline uint8_t inb(uint16_t port) {
-    uint8_t ret;
-    __asm__ volatile("inb %1, %0" : "=a"(ret) : "Nd"(port));
-    return ret;
+    uint8_t r;
+    __asm__ volatile("inb %1,%0" : "=a"(r) : "Nd"(port));
+    return r;
 }
 static inline void io_wait() { outb(0x80, 0); }
 
@@ -52,8 +53,7 @@ void idt_init() {
     idt_ptr.limit = sizeof(IDTEntry) * 256 - 1;
     idt_ptr.base  = (uint32_t)&idt;
 
-    for (int i = 0; i < 256; i++)
-        idt_set_gate(i, 0, 0, 0);
+    for (int i = 0; i < 256; i++) idt_set_gate(i, 0, 0, 0);
 
     pic_remap();
 
@@ -112,39 +112,31 @@ void idt_init() {
 
 extern "C" void isr_handler(Registers* regs) {
     static unsigned short* const VGA = (unsigned short*)0xB8000;
-    auto vga_entry = [](char c, unsigned char fg, unsigned char bg) -> unsigned short {
-        return (unsigned short)c | ((unsigned short)((bg << 4) | fg) << 8);
+    auto ve = [](char c, unsigned char fg, unsigned char bg) -> unsigned short {
+        return (unsigned short)c | ((unsigned short)((bg<<4)|fg)<<8);
     };
-    auto print = [&](const char* s, int row, int col, unsigned char fg) {
-        for (int i = 0; s[i]; i++)
-            VGA[row * 80 + col + i] = vga_entry(s[i], fg, 4);
+    auto pr = [&](const char* s, int row, int col, unsigned char fg) {
+        for (int i=0;s[i];i++) VGA[row*80+col+i]=ve(s[i],fg,4);
     };
-    auto print_hex = [&](uint32_t n, int row, int col) {
-        const char* hex = "0123456789ABCDEF";
-        char buf[9]; buf[8] = 0;
-        for (int i = 7; i >= 0; i--) { buf[i] = hex[n & 0xF]; n >>= 4; }
-        for (int i = 0; i < 8; i++)
-            VGA[row * 80 + col + i] = vga_entry(buf[i], 15, 4);
+    auto phex = [&](uint32_t n, int row, int col) {
+        const char* h="0123456789ABCDEF";
+        char b[9]; b[8]=0;
+        for(int i=7;i>=0;i--){b[i]=h[n&0xF];n>>=4;}
+        for(int i=0;i<8;i++) VGA[row*80+col+i]=ve(b[i],15,4);
     };
-
-    for (int i = 0; i < 80 * 5; i++)
-        VGA[10 * 80 + i] = vga_entry(' ', 15, 4);
-
-    print("*** KERNEL EXCEPTION ***", 10, 2, 14);
-    if (regs->int_no < 32)
-        print(exception_names[regs->int_no], 11, 2, 15);
-    print("INT:", 12, 2, 15); print_hex(regs->int_no, 12, 7);
-    print("ERR:", 12, 20, 15); print_hex(regs->err_code, 12, 25);
-    print("EIP:", 13, 2, 15); print_hex(regs->eip, 13, 7);
-    print("ESP:", 13, 20, 15); print_hex(regs->esp, 13, 25);
-
-    for (;;) __asm__ volatile("hlt");
+    for(int i=0;i<80*5;i++) VGA[10*80+i]=ve(' ',15,4);
+    pr("*** KERNEL EXCEPTION ***", 10, 2, 14);
+    if (regs->int_no < 32) pr(exception_names[regs->int_no], 11, 2, 15);
+    pr("INT:", 12, 2, 15);  phex(regs->int_no,   12, 7);
+    pr("ERR:", 12, 20, 15); phex(regs->err_code, 12, 25);
+    pr("EIP:", 13, 2, 15);  phex(regs->eip,      13, 7);
+    pr("ESP:", 13, 20, 15); phex(regs->esp,       13, 25);
+    for(;;) __asm__ volatile("hlt");
 }
 
 extern "C" void irq_handler(Registers* regs) {
-    static auto outb = [](uint16_t port, uint8_t val) {
-        __asm__ volatile("outb %0,%1" :: "a"(val), "Nd"(port));
-    };
+    if (regs->int_no == 33) keyboard_handler();
+
     if (regs->int_no >= 40) outb(0xA0, 0x20);
     outb(0x20, 0x20);
 }
