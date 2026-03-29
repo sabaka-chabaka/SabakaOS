@@ -1,5 +1,6 @@
-static unsigned short* const VGA = (unsigned short*)0xB8000;
+#include "gdt.h"
 
+static unsigned short* const VGA = (unsigned short*)0xB8000;
 static const int VGA_COLS = 80;
 static const int VGA_ROWS = 25;
 
@@ -23,8 +24,7 @@ enum Color : unsigned char {
 };
 
 static inline unsigned short vga_entry(char c, Color fg, Color bg) {
-    unsigned char color = (unsigned char)((bg << 4) | fg);
-    return (unsigned short)c | ((unsigned short)color << 8);
+    return (unsigned short)c | ((unsigned short)((bg << 4) | fg) << 8);
 }
 
 static void clear(Color bg = BLACK) {
@@ -34,12 +34,8 @@ static void clear(Color bg = BLACK) {
 
 static void print(const char* str, int row, int col,
                   Color fg = WHITE, Color bg = BLACK) {
-    for (int i = 0; str[i] != '\0'; i++)
+    for (int i = 0; str[i]; i++)
         VGA[row * VGA_COLS + col + i] = vga_entry(str[i], fg, bg);
-}
-
-static void putchar(char c, int row, int col, Color fg, Color bg = BLACK) {
-    VGA[row * VGA_COLS + col] = vga_entry(c, fg, bg);
 }
 
 static void fill_row(char c, int row, Color fg, Color bg = BLACK) {
@@ -47,57 +43,35 @@ static void fill_row(char c, int row, Color fg, Color bg = BLACK) {
         VGA[row * VGA_COLS + col] = vga_entry(c, fg, bg);
 }
 
-static void print_int(int n, int row, int col, Color fg = WHITE) {
-    if (n == 0) {
-        putchar('0', row, col, fg);
-        return;
-    }
-    char buf[12];
-    int i = 0;
-    bool neg = false;
-    if (n < 0) { neg = true; n = -n; }
-    while (n > 0) {
-        buf[i++] = '0' + (n % 10);
-        n /= 10;
-    }
-    if (neg) buf[i++] = '-';
-    for (int j = i - 1; j >= 0; j--)
-        putchar(buf[j], row, col++, fg);
+static void print_status(const char* msg, int row, bool ok = true) {
+    if (ok) print("[  OK  ]", row, 1, LIGHT_GREEN);
+    else    print("[ FAIL ]", row, 1, LIGHT_RED);
+    print(msg, row, 10, WHITE);
 }
 
 extern "C" void kernel_main() {
-
     clear(BLACK);
 
     fill_row(' ', 0, WHITE, BLUE);
-    print("  SabakaOS v0.0.1", 0, 0, WHITE, BLUE);
+    print("  SabakaOS v0.0.2", 0, 0, WHITE, BLUE);
     print("[x86 | Protected Mode | VGA 80x25]", 0, 44, YELLOW, BLUE);
 
-    print("[  OK  ]", 2, 1, LIGHT_GREEN);
-    print("Bootloader: GRUB Multiboot", 2, 10, WHITE);
+    gdt_init();
 
-    print("[  OK  ]", 3, 1, LIGHT_GREEN);
-    print("CPU: x86 32-bit Protected Mode", 3, 10, WHITE);
-
-    print("[  OK  ]", 4, 1, LIGHT_GREEN);
-    print("VGA: Text mode 80x25 initialized", 4, 10, WHITE);
-
-    print("[  OK  ]", 5, 1, LIGHT_GREEN);
-    print("Stack: 16 KiB at 0x", 5, 10, WHITE);
-    print("kernel_main: reached", 5, 30, LIGHT_CYAN);
+    print_status("Bootloader: GRUB Multiboot",                2);
+    print_status("CPU: x86 32-bit Protected Mode",            3);
+    print_status("VGA: Text mode 80x25",                      4);
+    print_status("GDT: 3 descriptors (null / code / data)",   5);
 
     print("--------------------------------------------------------------------------------",
           7, 0, DARK_GREY);
 
     print("Welcome to SabakaOS!", 9, 30, YELLOW);
     print("Build: " __DATE__ " " __TIME__, 10, 30, DARK_GREY);
-
-    print("System halted. Nothing to do yet - but the kernel is alive!", 12, 2, LIGHT_CYAN);
-    print("Next step: GDT, IDT, interrupts...", 13, 2, DARK_GREY);
+    print("Next: IDT + interrupts...", 12, 2, LIGHT_CYAN);
 
     fill_row(' ', 24, WHITE, BLUE);
     print("  SabakaOS Kernel | Halted", 24, 0, WHITE, BLUE);
 
-    for (;;)
-        __asm__ volatile("hlt");
+    for (;;) __asm__ volatile("hlt");
 }

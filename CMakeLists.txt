@@ -1,17 +1,20 @@
 cmake_minimum_required(VERSION 3.20)
-
 project(SabakaOS ASM_NASM C CXX)
 
 set(CMAKE_ASM_NASM_OBJECT_FORMAT elf32)
-
+enable_language(ASM_NASM)
 set(CMAKE_ASM_NASM_FLAGS "")
 
 set(SOURCES
         boot/boot.asm
+        kernel/gdt_flush.asm
+        kernel/gdt.cpp
         kernel/kernel.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
+
+target_include_directories(sabakaos.bin PRIVATE kernel)
 
 target_compile_options(sabakaos.bin PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:
@@ -54,8 +57,7 @@ add_custom_target(debug
         -kernel sabakaos.bin
         -m 32M
         -no-reboot
-        -s
-        -S
+        -s -S
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT ">>> QEMU ждёт GDB на localhost:1234..."
