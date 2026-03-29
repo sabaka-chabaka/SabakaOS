@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 project(SabakaOS ASM_NASM C CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_ASM_NASM_OBJECT_FORMAT elf32)
+set(CMAKE_ASM_NASM_COMPILE_OBJECT
+        "<CMAKE_ASM_NASM_COMPILER> -f elf32 -o <OBJECT> <SOURCE>")
 enable_language(ASM_NASM)
-set(CMAKE_ASM_NASM_FLAGS "-f elf32")
+set(CMAKE_ASM_NASM_FLAGS "")
 
 set(SOURCES
         boot/boot.asm
