@@ -62,7 +62,6 @@ static void term_cursor(bool on){
 static void on_key(char c){
     term_cursor(false);
     term_putchar(c);
-    if(c=='\n') term_puts("sabaka> ");
     term_cursor(true);
 }
 
@@ -146,7 +145,6 @@ extern "C" void kernel_main() {
     vga_print("Terminal:",15,1,YELLOW);
     vga_fill('-',TERM_TOP-1,DARK_GREY);
 
-    term_puts("sabaka> ");
     term_cursor(true);
 
     vga_fill(' ',24,WHITE,BLUE);
