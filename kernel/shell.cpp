@@ -1,6 +1,7 @@
 #include "shell.h"
 
 #include <heap.h>
+#include <pit.h>
 #include <kstring.h>
 #include <pmm.h>
 #include <terminal.h>
@@ -108,6 +109,31 @@ static void cmd_version(const ShellArgs&) {
     terminal_puts("  Shell:   SabakaShell v1.0\n");
 }
 
+static void cmd_uptime(const ShellArgs&) {
+    uint32_t ms  = pit_uptime_ms();
+    uint32_t sec = ms / 1000;
+    uint32_t min = sec / 60;
+    uint32_t hr  = min / 60;
+    sec %= 60; min %= 60;
+
+    terminal_set_color_fg(14);
+    terminal_puts("Uptime: ");
+    terminal_reset_color();
+    terminal_put_uint(hr);  terminal_puts("h ");
+    terminal_put_uint(min); terminal_puts("m ");
+    terminal_put_uint(sec); terminal_puts("s (");
+    terminal_put_uint(ms);  terminal_puts(" ms)\n");
+}
+
+static void cmd_sleep(const ShellArgs& args) {
+    if (args.argc < 2) {
+        terminal_puts("Usage: sleep <milliseconds>\n");
+        return;
+    }
+    uint32_t ms = (uint32_t)katoi(args.argv[1]);
+    pit_sleep_ms(ms);
+}
+
 static void cmd_reboot(const ShellArgs&) {
     terminal_set_color_fg(12);
     terminal_puts("Rebooting...\n");
@@ -180,6 +206,8 @@ void shell_init() {
     shell_register("echo",    "Print arguments",          cmd_echo);
     shell_register("mem",     "Memory statistics",        cmd_mem);
     shell_register("version", "OS version info",          cmd_version);
+    shell_register("uptime",  "Show system uptime",        cmd_uptime);
+    shell_register("sleep",   "sleep <ms>",                cmd_sleep);
     shell_register("reboot",  "Reboot the system",        cmd_reboot);
     shell_register("halt",    "Halt the system",          cmd_halt);
     shell_register("hexdump", "hexdump <addr> <size>",    cmd_hexdump);

@@ -1,5 +1,6 @@
 #include "idt.h"
 #include "keyboard.h"
+#include "pit.h"
 
 static IDTEntry idt[256];
 static IDTPointer idt_ptr;
@@ -135,6 +136,7 @@ extern "C" void isr_handler(Registers* regs) {
 }
 
 extern "C" void irq_handler(Registers* regs) {
+    if (regs->int_no == 32) pit_tick();
     if (regs->int_no == 33) keyboard_handler();
 
     if (regs->int_no >= 40) outb(0xA0, 0x20);

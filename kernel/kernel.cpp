@@ -7,6 +7,7 @@
 #include "kstring.h"
 #include "terminal.h"
 #include "shell.h"
+#include "pit.h"
 
 static unsigned short* const VGA = (unsigned short*)0xB8000;
 static const int COLS = 80;
@@ -38,7 +39,7 @@ extern "C" void kernel_main() {
     for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
 
     vga_fill(' ',0,15,1);
-    vga_print("  SabakaOS v0.0.7",0,0,15,1);
+    vga_print("  SabakaOS v0.0.9",0,0,15,1);
     vga_print("[x86 | Protected Mode | VGA 80x25]",0,44,14,1);
 
     gdt_init();
@@ -52,6 +53,8 @@ extern "C" void kernel_main() {
     bool heap_ok = paging_alloc_region(HEAP_VIRT, HEAP_SIZE,
                                        PAGE_PRESENT | PAGE_WRITE);
     if (heap_ok) heap_init(HEAP_VIRT, HEAP_SIZE);
+
+    pit_init(1000);
 
     keyboard_init();
 
