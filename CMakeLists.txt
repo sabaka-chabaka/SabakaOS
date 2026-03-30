@@ -18,6 +18,7 @@ set(SOURCES
         kernel/pmm.cpp
         kernel/paging.cpp
         kernel/heap.cpp
+        kernel/kstring.cpp
         kernel/kernel.cpp
 )
 
