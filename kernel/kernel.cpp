@@ -105,7 +105,7 @@ extern "C" void kernel_main() {
     paging_init();
     ok("Paging: enabled, identity map 0-4MB", 6);
 
-    heap_init(8 * 1024 * 1024, 2 * 1024 * 1024);
+    heap_init(2 * 1024 * 1024, 1 * 1024 * 1024);
     ok("Heap: 2MB kmalloc/kfree ready (new/delete ok)", 7);
 
     int* test = new int(42);
