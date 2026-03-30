@@ -36,10 +36,19 @@ uint32_t pit_uptime_sec() {
 }
 
 void pit_sleep_ms(uint32_t ms) {
-    uint32_t ticks = ms * pit_frequency / 1000;
+    if (ms == 0) return;
+
     uint32_t start = pit_tick_count;
-    while (pit_tick_count - start < ticks)
-        __asm__ volatile("hlt");
+
+    uint32_t ticks =
+        (ms / 1000) * pit_frequency +
+        (ms % 1000) * pit_frequency / 1000;
+
+    if (ticks == 0) ticks = 1;
+
+    while ((uint32_t)(pit_tick_count - start) < ticks) {
+        __asm__ volatile("sti; hlt; cli");
+    }
 }
 
 void pit_sleep(uint32_t seconds) {

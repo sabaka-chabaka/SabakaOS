@@ -7,6 +7,9 @@
 #include <pmm.h>
 #include <terminal.h>
 
+#include "process.h"
+#include "scheduler.h"
+
 static const int CMD_MAX = 32;
 static ShellCommand cmds[CMD_MAX];
 static int cmd_count = 0;
@@ -287,6 +290,122 @@ static void cmd_hexdump(const ShellArgs& args) {
     }
 }
 
+static const char* proc_state_str(ProcessState s) {
+    switch (s) {
+        case PROC_RUNNING: return "RUN  ";
+        case PROC_READY:   return "READY";
+        case PROC_BLOCKED: return "BLOCK";
+        case PROC_SLEEP:   return "SLEEP";
+        case PROC_DEAD:    return "DEAD ";
+        default:           return "?????";
+    }
+}
+
+static void cmd_ps(const ShellArgs&) {
+    terminal_set_color_fg(14);
+    terminal_puts("PID  STATE  PRI  TICKS     NAME\n");
+    terminal_puts("---  -----  ---  --------  --------\n");
+    terminal_reset_color();
+
+    for (int i = 0; i < PROC_MAX; i++) {
+        Process* p = scheduler_get(i);
+        if (!p || p->state == PROC_DEAD) continue;
+
+        char buf[12];
+        kuitoa(p->pid, buf, 10);
+        int pad = 4 - (int)kstrlen(buf);
+        while(pad-- > 0) terminal_putchar(' ');
+        terminal_puts(buf);
+        terminal_putchar(' ');
+
+        if (p->state == PROC_RUNNING) terminal_set_color_fg(10);
+        else terminal_set_color_fg(7);
+        terminal_puts(proc_state_str(p->state));
+        terminal_reset_color();
+        terminal_puts("  ");
+
+        kuitoa(p->priority, buf, 10);
+        pad = 3 - (int)kstrlen(buf);
+        while(pad-- > 0) terminal_putchar(' ');
+        terminal_puts(buf);
+        terminal_puts("  ");
+
+        kuitoa(p->ticks_total, buf, 10);
+        pad = 8 - (int)kstrlen(buf);
+        while(pad-- > 0) terminal_putchar(' ');
+        terminal_puts(buf);
+        terminal_puts("  ");
+
+        terminal_set_color_fg(11);
+        terminal_puts(p->name);
+        terminal_reset_color();
+        terminal_newline();
+    }
+}
+
+static void cmd_kill(const ShellArgs& args) {
+    if (args.argc < 2) {
+        terminal_puts("Usage: kill <pid>\n");
+        return;
+    }
+    uint32_t pid = (uint32_t)katoi(args.argv[1]);
+    if (pid == 0) {
+        terminal_set_color_fg(12);
+        terminal_puts("Cannot kill kernel process (pid 0)\n");
+        terminal_reset_color();
+        return;
+    }
+    for (int i = 0; i < PROC_MAX; i++) {
+        Process* p = scheduler_get(i);
+        if (p && p->pid == pid && p->state != PROC_DEAD) {
+            p->state = PROC_DEAD;
+            terminal_set_color_fg(10);
+            terminal_puts("Killed process ");
+            terminal_puts(p->name);
+            terminal_putchar('\n');
+            terminal_reset_color();
+            return;
+        }
+    }
+    terminal_set_color_fg(12);
+    terminal_puts("No process with pid ");
+    char buf[12]; kuitoa(pid, buf, 10);
+    terminal_puts(buf);
+    terminal_putchar('\n');
+    terminal_reset_color();
+}
+
+static void cmd_spawn(const ShellArgs& args) {
+    if (args.argc < 2) {
+        terminal_puts("Usage: spawn <name>\n");
+        terminal_puts("  Spawns a test counter process\n");
+        return;
+    }
+    Process* p = process_create(
+        [](void*) {
+            uint32_t n = 0;
+            while(true) { n++; process_sleep(1000); }
+        },
+        nullptr,
+        args.argv[1],
+        5
+    );
+    if (p) {
+        terminal_set_color_fg(10);
+        terminal_puts("Spawned: ");
+        terminal_puts(p->name);
+        terminal_puts(" (pid ");
+        char buf[12]; kuitoa(p->pid, buf, 10);
+        terminal_puts(buf);
+        terminal_puts(")\n");
+        terminal_reset_color();
+    } else {
+        terminal_set_color_fg(12);
+        terminal_puts("Failed to spawn process\n");
+        terminal_reset_color();
+    }
+}
+
 void shell_init() {
     shell_register("help",    "Show this help",           cmd_help);
     shell_register("clear",   "Clear terminal",           cmd_clear);
@@ -305,6 +424,9 @@ void shell_init() {
     shell_register("reboot",  "Reboot the system",        cmd_reboot);
     shell_register("halt",    "Halt the system",          cmd_halt);
     shell_register("hexdump", "hexdump <addr> <size>",    cmd_hexdump);
+    shell_register("spawn", "spawn <name>",            cmd_spawn);
+    shell_register("kill",  "kill <pid>",              cmd_kill);
+    shell_register("ps",    "List processes",          cmd_ps);
 }
 
 void shell_execute(const char* line) {

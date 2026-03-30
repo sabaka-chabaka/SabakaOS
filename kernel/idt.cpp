@@ -1,8 +1,9 @@
 #include "idt.h"
 #include "keyboard.h"
 #include "pit.h"
+#include "scheduler.h"
 
-static IDTEntry idt[256];
+static IDTEntry   idt[256] __attribute__((aligned(8)));
 static IDTPointer idt_ptr;
 
 static const char* exception_names[] = {
@@ -37,27 +38,18 @@ static inline uint8_t inb(uint16_t port) {
 static inline void io_wait() { outb(0x80, 0); }
 
 static void pic_remap() {
-    uint8_t m1 = inb(0x21), m2 = inb(0xA1);
-    outb(0x20, 0x11); io_wait();
-    outb(0xA0, 0x11); io_wait();
-    outb(0x21, 0x20); io_wait();
-    outb(0xA1, 0x28); io_wait();
-    outb(0x21, 0x04); io_wait();
-    outb(0xA1, 0x02); io_wait();
-    outb(0x21, 0x01); io_wait();
-    outb(0xA1, 0x01); io_wait();
-    outb(0x21, m1);
-    outb(0xA1, m2);
+    outb(0x20, 0x11); io_wait(); outb(0xA0, 0x11); io_wait();
+    outb(0x21, 0x20); io_wait(); outb(0xA1, 0x28); io_wait();
+    outb(0x21, 0x04); io_wait(); outb(0xA1, 0x02); io_wait();
+    outb(0x21, 0x01); io_wait(); outb(0xA1, 0x01); io_wait();
+    outb(0x21, 0x00); outb(0xA1, 0x00);
 }
 
 void idt_init() {
     idt_ptr.limit = sizeof(IDTEntry) * 256 - 1;
     idt_ptr.base  = (uint32_t)&idt;
-
     for (int i = 0; i < 256; i++) idt_set_gate(i, 0, 0, 0);
-
     pic_remap();
-
     idt_set_gate(0,  (uint32_t)isr0,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(1,  (uint32_t)isr1,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(2,  (uint32_t)isr2,  0x08, IDT_GATE_INTERRUPT);
@@ -90,7 +82,6 @@ void idt_init() {
     idt_set_gate(29, (uint32_t)isr29, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(30, (uint32_t)isr30, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(31, (uint32_t)isr31, 0x08, IDT_GATE_INTERRUPT);
-
     idt_set_gate(32, (uint32_t)irq0,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(33, (uint32_t)irq1,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(34, (uint32_t)irq2,  0x08, IDT_GATE_INTERRUPT);
@@ -107,17 +98,16 @@ void idt_init() {
     idt_set_gate(45, (uint32_t)irq13, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(46, (uint32_t)irq14, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(47, (uint32_t)irq15, 0x08, IDT_GATE_INTERRUPT);
-
     idt_flush((uint32_t)&idt_ptr);
 }
 
 extern "C" void isr_handler(Registers* regs) {
     static unsigned short* const VGA = (unsigned short*)0xB8000;
-    auto ve = [](char c, unsigned char fg, unsigned char bg) -> unsigned short {
+    auto ve = [](char c, uint8_t fg, uint8_t bg) -> unsigned short {
         return (unsigned short)c | ((unsigned short)((bg<<4)|fg)<<8);
     };
-    auto pr = [&](const char* s, int row, int col, unsigned char fg) {
-        for (int i=0;s[i];i++) VGA[row*80+col+i]=ve(s[i],fg,4);
+    auto pr = [&](const char* s, int row, int col, uint8_t fg) {
+        for(int i=0;s[i];i++) VGA[row*80+col+i]=ve(s[i],fg,4);
     };
     auto phex = [&](uint32_t n, int row, int col) {
         const char* h="0123456789ABCDEF";
@@ -125,20 +115,25 @@ extern "C" void isr_handler(Registers* regs) {
         for(int i=7;i>=0;i--){b[i]=h[n&0xF];n>>=4;}
         for(int i=0;i<8;i++) VGA[row*80+col+i]=ve(b[i],15,4);
     };
-    for(int i=0;i<80*5;i++) VGA[10*80+i]=ve(' ',15,4);
-    pr("*** KERNEL EXCEPTION ***", 10, 2, 14);
-    if (regs->int_no < 32) pr(exception_names[regs->int_no], 11, 2, 15);
-    pr("INT:", 12, 2, 15);  phex(regs->int_no,   12, 7);
-    pr("ERR:", 12, 20, 15); phex(regs->err_code, 12, 25);
-    pr("EIP:", 13, 2, 15);  phex(regs->eip,      13, 7);
-    pr("ESP:", 13, 20, 15); phex(regs->esp,       13, 25);
-    for(;;) __asm__ volatile("hlt");
+    for(int i=0;i<80*6;i++) VGA[9*80+i]=ve(' ',15,4);
+    pr("*** KERNEL EXCEPTION ***", 9,  2, 14);
+    if (regs->int_no < 32) pr(exception_names[regs->int_no], 10, 2, 15);
+    pr("INT:", 11, 2, 15);  phex(regs->int_no,   11, 7);
+    pr("ERR:", 11, 20, 15); phex(regs->err_code, 11, 25);
+    pr("EIP:", 12, 2, 15);  phex(regs->eip,      12, 7);
+    pr("ESP:", 12, 20, 15); phex(regs->esp,       12, 25);
+    pr("CS: ", 13, 2, 15);  phex(regs->cs,        13, 7);
+    pr("EFL:", 13, 20, 15); phex(regs->eflags,    13, 25);
+    for(;;) __asm__ volatile("cli; hlt");
 }
 
 extern "C" void irq_handler(Registers* regs) {
-    if (regs->int_no == 32) pit_tick();
-    if (regs->int_no == 33) keyboard_handler();
-
     if (regs->int_no >= 40) outb(0xA0, 0x20);
     outb(0x20, 0x20);
+
+    if (regs->int_no == 32) {
+        pit_tick();
+        scheduler_tick();
+    }
+    if (regs->int_no == 33) keyboard_handler();
 }

@@ -23,6 +23,10 @@ set(SOURCES
         kernel/pit.cpp
         kernel/vfs.cpp
         kernel/shell.cpp
+        kernel/tss_flush.asm
+        kernel/tss.cpp
+        kernel/context_switch.asm
+        kernel/scheduler.cpp
         kernel/kernel.cpp
 )
 
@@ -47,7 +51,7 @@ add_custom_target(run
         COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -serial stdio
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT ">>> Запускаем SabakaOS..."
+        COMMENT ">>> Запускаем SabakaOS v0.1.0..."
 )
 
 add_custom_target(debug
