@@ -87,11 +87,23 @@ static int  hist_idx   = -1;
 static int  prompt_row = TERM_ROW_START;
 static int  prompt_col = 0;
 
+static char prompt_path[256] = "/";
+
+void terminal_set_prompt_path(const char* path) {
+    uint32_t i = 0;
+    while (path[i] && i < sizeof(prompt_path)-1) { prompt_path[i] = path[i]; i++; }
+    prompt_path[i] = 0;
+}
+
 static void print_prompt() {
     cursor_show(false);
     cur_fg = C_LCYAN;  terminal_puts("sabaka");
     cur_fg = C_WHITE;  terminal_putchar('@');
     cur_fg = C_LGREEN; terminal_puts("SabakaOS");
+    cur_fg = C_WHITE;  terminal_puts(": ");
+    cur_fg = C_LCYAN;  terminal_puts("~");
+    if (prompt_path[0] == '/' && prompt_path[1] != 0)
+        terminal_puts(prompt_path);
     cur_fg = C_WHITE;  terminal_puts("> ");
     cur_fg = C_WHITE;
 }

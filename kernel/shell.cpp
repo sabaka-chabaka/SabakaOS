@@ -165,8 +165,13 @@ static void cmd_pwd(const ShellArgs&) {
 
 static void cmd_cd(const ShellArgs& args) {
     const char* path = (args.argc >= 2) ? args.argv[1] : "/";
-    if (vfs_chdir(path) != 0)
+    if (vfs_chdir(path) != 0) {
         terminal_puts("cd: no such directory\n");
+    } else {
+        char buf[256];
+        vfs_get_cwd_path(buf, sizeof(buf));
+        terminal_set_prompt_path(buf);
+    }
 }
 
 static void cmd_mkdir(const ShellArgs& args) {
@@ -204,10 +209,16 @@ static void cmd_write(const ShellArgs& args) {
         if (!node) { terminal_puts("write: cannot create file\n"); return; }
     }
     if (node->type != VFS_FILE) { terminal_puts("write: not a file\n"); return; }
-    const char* text = args.argv[2];
-    uint32_t len = (uint32_t)kstrlen(text);
-    vfs_write(node, (const uint8_t*)text, 0, len);
-    vfs_write(node, (const uint8_t*)"\n", len, 1);
+    char text[VFS_MAX_FILE_DATA];
+    uint32_t tlen = 0;
+    for (int i = 2; i < args.argc && tlen < VFS_MAX_FILE_DATA - 1; i++) {
+        if (i > 2 && tlen < VFS_MAX_FILE_DATA - 1) text[tlen++] = ' ';
+        const char* w = args.argv[i];
+        while (*w && tlen < VFS_MAX_FILE_DATA - 1) text[tlen++] = *w++;
+    }
+    text[tlen] = 0;
+    vfs_write(node, (const uint8_t*)text, 0, tlen);
+    vfs_write(node, (const uint8_t*)"\n", tlen, 1);
 }
 
 static void cmd_reboot(const ShellArgs&) {

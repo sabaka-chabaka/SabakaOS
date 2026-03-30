@@ -14,3 +14,4 @@ void terminal_set_color_fg(uint8_t fg);
 void terminal_reset_color();
 void terminal_on_key(char c);
 void terminal_reply_input();
+void terminal_set_prompt_path(const char* path);

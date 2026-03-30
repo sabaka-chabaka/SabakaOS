@@ -40,7 +40,7 @@ extern "C" void kernel_main() {
     for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
 
     vga_fill(' ',0,15,1);
-    vga_print("  SabakaOS v0.0.9",0,0,15,1);
+    vga_print("  SabakaOS v0.0.10",0,0,15,1);
     vga_print("[x86 | Protected Mode | VGA 80x25]",0,44,14,1);
 
     gdt_init();
