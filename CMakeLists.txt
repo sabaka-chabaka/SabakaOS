@@ -44,14 +44,14 @@ target_link_options(sabakaos.bin PRIVATE
 )
 
 add_custom_target(run
-        COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -no-reboot -serial stdio
+        COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -serial stdio
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT ">>> Запускаем SabakaOS..."
 )
 
 add_custom_target(debug
-        COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -no-reboot -s -S
+        COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -s -S
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT ">>> QEMU ждёт GDB на :1234..."
