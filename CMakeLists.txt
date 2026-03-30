@@ -19,6 +19,8 @@ set(SOURCES
         kernel/paging.cpp
         kernel/heap.cpp
         kernel/kstring.cpp
+        kernel/terminal.cpp
+        kernel/shell.cpp
         kernel/kernel.cpp
 )
 
