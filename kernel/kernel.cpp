@@ -76,7 +76,6 @@ static void term_clear_cursor() {
 static void on_key(char c) {
     term_clear_cursor();
     term_putchar(c);
-    if(c == '\n') term_puts("sabaka> ");
     term_draw_cursor();
 }
 
@@ -104,7 +103,6 @@ extern "C" void kernel_main() {
     print("Hint: backspace works, enter adds new line", 12, 2, DARK_GREY);
     print("--------------------------------------------------------------------------------", 13, 0, DARK_GREY);
 
-    term_puts("sabaka> ");
     term_draw_cursor();
 
     fill(' ', 24, WHITE, BLUE);
