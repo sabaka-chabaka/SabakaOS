@@ -21,6 +21,7 @@ set(SOURCES
         kernel/kstring.cpp
         kernel/terminal.cpp
         kernel/pit.cpp
+        kernel/vfs.cpp
         kernel/shell.cpp
         kernel/kernel.cpp
 )

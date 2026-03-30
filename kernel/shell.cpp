@@ -2,6 +2,7 @@
 
 #include <heap.h>
 #include <pit.h>
+#include <vfs.h>
 #include <kstring.h>
 #include <pmm.h>
 #include <terminal.h>
@@ -134,6 +135,81 @@ static void cmd_sleep(const ShellArgs& args) {
     pit_sleep_ms(ms);
 }
 
+static void cmd_ls(const ShellArgs& args) {
+    VfsNode* dir = (args.argc >= 2) ? vfs_resolve_path(args.argv[1]) : vfs_cwd();
+    if (!dir) { terminal_puts("ls: no such directory\n"); return; }
+    if (dir->type != VFS_DIR) { terminal_puts("ls: not a directory\n"); return; }
+    char name[VFS_MAX_NAME];
+    for (uint32_t i = 0; vfs_readdir(dir, i, name) == 0; i++) {
+        VfsNode* child = vfs_finddir(dir, name);
+        if (child && child->type == VFS_DIR) {
+            terminal_set_color_fg(14);
+            terminal_puts(name);
+            terminal_puts("/");
+            terminal_reset_color();
+        } else {
+            terminal_set_color_fg(15);
+            terminal_puts(name);
+            terminal_reset_color();
+        }
+        terminal_putchar('\n');
+    }
+}
+
+static void cmd_pwd(const ShellArgs&) {
+    char buf[256];
+    vfs_get_cwd_path(buf, sizeof(buf));
+    terminal_puts(buf);
+    terminal_putchar('\n');
+}
+
+static void cmd_cd(const ShellArgs& args) {
+    const char* path = (args.argc >= 2) ? args.argv[1] : "/";
+    if (vfs_chdir(path) != 0)
+        terminal_puts("cd: no such directory\n");
+}
+
+static void cmd_mkdir(const ShellArgs& args) {
+    if (args.argc < 2) { terminal_puts("Usage: mkdir <name>\n"); return; }
+    VfsNode* node = vfs_mkdir(vfs_cwd(), args.argv[1]);
+    if (!node) terminal_puts("mkdir: failed (exists or no space)\n");
+}
+
+static void cmd_touch(const ShellArgs& args) {
+    if (args.argc < 2) { terminal_puts("Usage: touch <name>\n"); return; }
+    VfsNode* node = vfs_create(vfs_cwd(), args.argv[1]);
+    if (!node) terminal_puts("touch: failed (exists or no space)\n");
+}
+
+static void cmd_cat(const ShellArgs& args) {
+    if (args.argc < 2) { terminal_puts("Usage: cat <path>\n"); return; }
+    VfsNode* node = vfs_resolve_path(args.argv[1]);
+    if (!node) { terminal_puts("cat: no such file\n"); return; }
+    if (node->type != VFS_FILE) { terminal_puts("cat: not a file\n"); return; }
+    if (node->size == 0) return;
+    uint8_t buf[VFS_MAX_FILE_DATA + 1];
+    int n = vfs_read(node, buf, 0, node->size);
+    if (n > 0) {
+        buf[n] = 0;
+        terminal_puts((char*)buf);
+        if (buf[n-1] != '\n') terminal_putchar('\n');
+    }
+}
+
+static void cmd_write(const ShellArgs& args) {
+    if (args.argc < 3) { terminal_puts("Usage: write <path> <text>\n"); return; }
+    VfsNode* node = vfs_resolve_path(args.argv[1]);
+    if (!node) {
+        node = vfs_create(vfs_cwd(), args.argv[1]);
+        if (!node) { terminal_puts("write: cannot create file\n"); return; }
+    }
+    if (node->type != VFS_FILE) { terminal_puts("write: not a file\n"); return; }
+    const char* text = args.argv[2];
+    uint32_t len = (uint32_t)kstrlen(text);
+    vfs_write(node, (const uint8_t*)text, 0, len);
+    vfs_write(node, (const uint8_t*)"\n", len, 1);
+}
+
 static void cmd_reboot(const ShellArgs&) {
     terminal_set_color_fg(12);
     terminal_puts("Rebooting...\n");
@@ -206,6 +282,13 @@ void shell_init() {
     shell_register("echo",    "Print arguments",          cmd_echo);
     shell_register("mem",     "Memory statistics",        cmd_mem);
     shell_register("version", "OS version info",          cmd_version);
+    shell_register("ls",      "List directory",            cmd_ls);
+    shell_register("pwd",     "Print working directory",   cmd_pwd);
+    shell_register("cd",      "Change directory",          cmd_cd);
+    shell_register("mkdir",   "Create directory",          cmd_mkdir);
+    shell_register("touch",   "Create empty file",         cmd_touch);
+    shell_register("cat",     "Print file contents",       cmd_cat);
+    shell_register("write",   "write <file> <text>",       cmd_write);
     shell_register("uptime",  "Show system uptime",        cmd_uptime);
     shell_register("sleep",   "sleep <ms>",                cmd_sleep);
     shell_register("reboot",  "Reboot the system",        cmd_reboot);

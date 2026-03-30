@@ -8,6 +8,7 @@
 #include "terminal.h"
 #include "shell.h"
 #include "pit.h"
+#include "vfs.h"
 
 static unsigned short* const VGA = (unsigned short*)0xB8000;
 static const int COLS = 80;
@@ -55,6 +56,8 @@ extern "C" void kernel_main() {
     if (heap_ok) heap_init(HEAP_VIRT, HEAP_SIZE);
 
     pit_init(1000);
+
+    vfs_init();
 
     keyboard_init();
 
