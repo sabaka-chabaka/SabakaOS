@@ -15,6 +15,9 @@ set(SOURCES
         kernel/isr.asm
         kernel/idt.cpp
         kernel/keyboard.cpp
+        kernel/pmm.cpp
+        kernel/paging.cpp
+        kernel/heap.cpp
         kernel/kernel.cpp
 )
 
