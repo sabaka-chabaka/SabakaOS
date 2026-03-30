@@ -121,7 +121,49 @@ static void start_input() {
     cursor_show(true);
 }
 
+static void input_clear_line() {
+    cursor_show(false);
+    int r = prompt_row, c = prompt_col;
+    for (int i = 0; i < input_len; i++) {
+        VGA[r*COLS+c] = ve(' ', C_WHITE, C_BLACK);
+        if (++c >= COLS) { c=0; r++; }
+    }
+    input_len = 0;
+    input_pos = 0;
+}
+
 void terminal_on_key(char c) {
+    if (c == 17) { // UP
+        if (hist_count > 0) {
+            if (hist_idx == -1) hist_idx = hist_count - 1;
+            else if (hist_idx > 0) hist_idx--;
+
+            input_clear_line();
+            kstrcpy(input_buf, history[hist_idx]);
+            input_len = kstrlen(input_buf);
+            input_pos = input_len;
+            input_redraw();
+        }
+        return;
+    }
+
+    if (c == 18) {
+        if (hist_idx != -1) {
+            hist_idx++;
+            input_clear_line();
+            if (hist_idx < hist_count) {
+                kstrcpy(input_buf, history[hist_idx]);
+            } else {
+                hist_idx = -1;
+                kmemset(input_buf, 0, INPUT_MAX);
+            }
+            input_len = kstrlen(input_buf);
+            input_pos = input_len;
+            input_redraw();
+        }
+        return;
+    }
+
     if (c == '\n') {
         cursor_show(false);
         cur_row = prompt_row;
