@@ -162,5 +162,8 @@ void terminal_on_key(char c) {
 
 void terminal_init() {
     terminal_clear();
+}
+
+void terminal_reply_input() {
     start_input();
 }

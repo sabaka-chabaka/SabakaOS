@@ -41,13 +41,9 @@ extern "C" void kernel_main() {
     vga_print("  SabakaOS v0.0.7",0,0,15,1);
     vga_print("[x86 | Protected Mode | VGA 80x25]",0,44,14,1);
 
-    int boot_row = 1;
-
     gdt_init();
-    ok("GDT", boot_row++);
 
     idt_init();
-    ok("IDT + PIC + STI", boot_row++);
 
     pmm_init(32 * 1024 * 1024);
 
@@ -58,9 +54,6 @@ extern "C" void kernel_main() {
     if (heap_ok) heap_init(HEAP_VIRT, HEAP_SIZE);
 
     keyboard_init();
-
-    vga_fill('-', 2, 8, 0);
-    vga_print(" SabakaShell v1.0 ", 2, 31, 11, 0);
 
     vga_fill(' ', 24, 15, 1);
     vga_print("  SabakaOS v0.0.7 | Shell ready | type 'help'", 24, 0, 15, 1);
@@ -79,7 +72,9 @@ extern "C" void kernel_main() {
     terminal_set_color_fg(10);
     terminal_puts("help");
     terminal_reset_color();
-    terminal_puts(" to see available commands.\n\n");
+    terminal_puts(" to see available commands.");
+
+    terminal_reply_input();
 
     for(;;) __asm__ volatile("hlt");
 }
