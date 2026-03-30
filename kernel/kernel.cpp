@@ -72,7 +72,7 @@ extern "C" void kernel_main() {
     terminal_set_color_fg(10);
     terminal_puts("help");
     terminal_reset_color();
-    terminal_puts(" to see available commands.");
+    terminal_puts(" to see available commands.\n");
 
     terminal_reply_input();
 
