@@ -1,1 +1,1 @@
-1. make command picker with keyboard arrows
+1. make command picker with keyboard arrows - COMPLETED
