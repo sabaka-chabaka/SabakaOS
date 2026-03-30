@@ -1,0 +1,1 @@
+1. make command picker with keyboard arrows
