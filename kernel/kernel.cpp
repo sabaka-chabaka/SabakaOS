@@ -99,7 +99,7 @@ extern "C" void kernel_main() {
     for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
 
     vga_fill(' ',0,15,1);
-    vga_print("  SabakaOS v0.2.0",0,0,15,1);
+    vga_print("  SabakaOS v0.1.5",0,0,15,1);
     vga_print("[x86 | Protected Mode | Syscall | Mutex | Pipe]",0,32,14,1);
 
     gdt_init();
@@ -133,7 +133,7 @@ extern "C" void kernel_main() {
 
     vga_fill('-', 1, 8);
     vga_fill(' ', 24, 15, 1);
-    vga_print("  SabakaOS v0.2.0 | syscall+mutex+pipe | type 'help'", 24, 0, 15, 1);
+    vga_print("  SabakaOS v0.1.5 | syscall+mutex+pipe | type 'help'", 24, 0, 15, 1);
 
     terminal_init();
     shell_init();
