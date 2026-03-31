@@ -48,3 +48,5 @@ extern "C" void irq15();
 extern "C" void isr128();
 
 extern "C" void idt_flush(uint32_t);
+
+void serial_write_string(const char* str);

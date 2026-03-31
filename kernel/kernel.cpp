@@ -94,9 +94,6 @@ static void pipe_consumer(void* arg) {
     process_exit();
 }
 
-static void idle_proc(void*) {
-    while (true) __asm__ volatile("hlt");
-}
 
 extern "C" void kernel_main() {
     for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
@@ -123,7 +120,6 @@ extern "C" void kernel_main() {
     mutex_init(&shared_mutex);
 
     scheduler_init();
-    process_create(idle_proc, nullptr, "idle", 1);
 
     process_create(syscall_test_proc, nullptr,  "syscall_test", 5);
     process_create(mutex_proc_a,      nullptr,  "mutex_a",      5);
@@ -152,5 +148,6 @@ extern "C" void kernel_main() {
 
     terminal_reply_input();
 
+    __asm__ volatile("sti");
     for(;;) __asm__ volatile("hlt");
 }

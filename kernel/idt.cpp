@@ -44,7 +44,7 @@ static void pic_remap() {
     outb(0x21, 0x20); io_wait(); outb(0xA1, 0x28); io_wait();
     outb(0x21, 0x04); io_wait(); outb(0xA1, 0x02); io_wait();
     outb(0x21, 0x01); io_wait(); outb(0xA1, 0x01); io_wait();
-    outb(0x21, m1); outb(0xA1, m2);
+    outb(0x21, m1 & ~0x03); outb(0xA1, m2);
 }
 
 void idt_init() {
@@ -102,7 +102,7 @@ void idt_init() {
     idt_set_gate(46, (uint32_t)irq14, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(47, (uint32_t)irq15, 0x08, IDT_GATE_INTERRUPT);
 
-    idt_set_gate(0x80, (uint32_t)irq15, 0x08, 0xEE);
+    idt_set_gate(0x80, (uint32_t)isr128, 0x08, IDT_GATE_SYSCALL);
 
     idt_flush((uint32_t)&idt_ptr);
 }
@@ -147,4 +147,19 @@ extern "C" void irq_handler(Registers* regs) {
 
     if (regs->int_no >= 40) outb(0xA0, 0x20);
     outb(0x20, 0x20);
+}
+
+static void serial_write(char c)
+{
+    while ((inb(0x3F8 + 5) & 0x20) == 0);
+    outb(0x3F8, c);
+}
+
+void serial_write_string(const char* str)
+{
+    while (*str)
+    {
+        serial_write(*str);
+        str++;
+    }
 }

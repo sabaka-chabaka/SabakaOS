@@ -22,3 +22,4 @@ struct SyscallArgs {
 };
 
 void syscall_init();
+extern "C" int32_t syscall_dispatch(struct Registers* regs);

@@ -16,10 +16,11 @@ struct Pipe {
 int pipe_create();
 void pipe_destroy(int id);
 
-int pipe_read(int id, const char* buf, uint32_t len);
-int pipe_write(int id, char* buf, uint32_t len);
+int pipe_read(int id, char* buf, uint32_t len);
+int pipe_write(int id, const char* buf, uint32_t len);
 
 int pipe_read_nb(int id, char* buf, uint32_t len);
 
 void pipe_close_write(int id);
 bool pipe_empty(int id);
+void pipe_init_all();
