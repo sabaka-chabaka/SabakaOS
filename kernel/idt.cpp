@@ -2,8 +2,9 @@
 #include "keyboard.h"
 #include "pit.h"
 #include "scheduler.h"
+#include "syscall.h"
 
-static IDTEntry   idt[256] __attribute__((aligned(8)));
+static IDTEntry   idt[256];
 static IDTPointer idt_ptr;
 
 static const char* exception_names[] = {
@@ -38,11 +39,12 @@ static inline uint8_t inb(uint16_t port) {
 static inline void io_wait() { outb(0x80, 0); }
 
 static void pic_remap() {
+    uint8_t m1 = inb(0x21), m2 = inb(0xA1);
     outb(0x20, 0x11); io_wait(); outb(0xA0, 0x11); io_wait();
     outb(0x21, 0x20); io_wait(); outb(0xA1, 0x28); io_wait();
     outb(0x21, 0x04); io_wait(); outb(0xA1, 0x02); io_wait();
     outb(0x21, 0x01); io_wait(); outb(0xA1, 0x01); io_wait();
-    outb(0x21, 0x00); outb(0xA1, 0x00);
+    outb(0x21, m1); outb(0xA1, m2);
 }
 
 void idt_init() {
@@ -50,6 +52,7 @@ void idt_init() {
     idt_ptr.base  = (uint32_t)&idt;
     for (int i = 0; i < 256; i++) idt_set_gate(i, 0, 0, 0);
     pic_remap();
+
     idt_set_gate(0,  (uint32_t)isr0,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(1,  (uint32_t)isr1,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(2,  (uint32_t)isr2,  0x08, IDT_GATE_INTERRUPT);
@@ -98,6 +101,9 @@ void idt_init() {
     idt_set_gate(45, (uint32_t)irq13, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(46, (uint32_t)irq14, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(47, (uint32_t)irq15, 0x08, IDT_GATE_INTERRUPT);
+
+    idt_set_gate(0x80, (uint32_t)irq15, 0x08, 0xEE);
+
     idt_flush((uint32_t)&idt_ptr);
 }
 
@@ -128,12 +134,17 @@ extern "C" void isr_handler(Registers* regs) {
 }
 
 extern "C" void irq_handler(Registers* regs) {
-    if (regs->int_no >= 40) outb(0xA0, 0x20);
-    outb(0x20, 0x20);
+    if (regs->int_no == 0x80) {
+        regs->eax = (uint32_t)syscall_dispatch(regs);
+        return;
+    }
 
     if (regs->int_no == 32) {
         pit_tick();
         scheduler_tick();
     }
     if (regs->int_no == 33) keyboard_handler();
+
+    if (regs->int_no >= 40) outb(0xA0, 0x20);
+    outb(0x20, 0x20);
 }

@@ -22,6 +22,7 @@ struct Registers {
 };
 
 #define IDT_GATE_INTERRUPT 0x8E
+#define IDT_GATE_SYSCALL   0xEE
 
 void idt_init();
 
@@ -43,5 +44,7 @@ extern "C" void irq6();  extern "C" void irq7();  extern "C" void irq8();
 extern "C" void irq9();  extern "C" void irq10(); extern "C" void irq11();
 extern "C" void irq12(); extern "C" void irq13(); extern "C" void irq14();
 extern "C" void irq15();
+
+extern "C" void isr128();
 
 extern "C" void idt_flush(uint32_t);
