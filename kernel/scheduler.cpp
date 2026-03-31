@@ -88,7 +88,9 @@ void process_exit() {
     procs[current_idx].state = PROC_DEAD;
     proc_count--;
     scheduler_yield();
-    for(;;) __asm__ volatile("hlt");
+    // Interrupts were re-enabled by scheduler_yield(); disable them now so
+    // the dead process cannot be entered again via the scheduler path.
+    for(;;) __asm__ volatile("cli; hlt");
 }
 
 void process_block(Process* p) {
@@ -102,7 +104,9 @@ void process_unblock(Process* p) {
 void process_sleep(uint32_t ms) {
     __asm__ volatile("cli");
     procs[current_idx].state       = PROC_SLEEP;
-    procs[current_idx].sleep_until = pit_ticks() + ms;
+    // Convert ms to PIT ticks so sleep_until is in the same unit as pit_ticks().
+    // pit_uptime_ms() uses pit_frequency, so we mirror that conversion here.
+    procs[current_idx].sleep_until = pit_ticks() + (ms * pit_get_frequency()) / 1000;
     scheduler_yield();
 }
 
@@ -148,7 +152,9 @@ static int find_next() {
         if (procs[idx].state == PROC_READY) return idx;
     }
 
-    if (procs[0].state != PROC_DEAD) return 0;
+    // Fall back to the idle/kernel process only if it is actually runnable.
+    if (procs[0].state == PROC_READY || procs[0].state == PROC_RUNNING) return 0;
+    // No runnable process found — stay on current (busy-wait in idle hlt loop).
     return current_idx;
 }
 

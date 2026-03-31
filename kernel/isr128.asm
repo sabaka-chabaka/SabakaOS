@@ -6,7 +6,9 @@ extern irq_handler
 global isr128
 
 isr128:
-    cli
+    ; NOTE: do NOT cli here — int 0x80 is a software interrupt.
+    ; Keeping interrupts enabled lets the PIT fire normally during syscalls.
+    ; The iret at the end restores the caller's original eflags (incl. IF).
     push dword 0
     push dword 0x80
     jmp isr128_common

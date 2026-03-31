@@ -27,6 +27,10 @@ uint32_t pit_ticks() {
     return pit_tick_count;
 }
 
+uint32_t pit_get_frequency() {
+    return pit_frequency;
+}
+
 uint32_t pit_uptime_ms() {
     return pit_tick_count * 1000 / pit_frequency;
 }
