@@ -20,6 +20,7 @@ set(SOURCES
         kernel/heap.cpp
         kernel/kstring.cpp
         kernel/terminal.cpp
+        kernel/syscall.cpp
         kernel/pit.cpp
         kernel/vfs.cpp
         kernel/shell.cpp
