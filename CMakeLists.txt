@@ -22,6 +22,7 @@ set(SOURCES
         kernel/terminal.cpp
         kernel/syscall.cpp
         kernel/mutex.cpp
+        kernel/pipe.cpp
         kernel/pit.cpp
         kernel/vfs.cpp
         kernel/shell.cpp
