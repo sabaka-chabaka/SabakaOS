@@ -37,28 +37,25 @@ static void vga_fill(char c, int row, unsigned char fg, unsigned char bg=0) {
 
 __attribute__((section(".user_text"), noinline))
 static void user_hello_proc() {
-    const char msg[] = "[Ring3] Hello from usermode (CPL=3)!\n";
-    uint32_t len = sizeof(msg) - 1;
-
     __asm__ volatile(
-        "mov $4,  %%eax \n"
-        "mov $1,  %%ebx \n"
-        "mov %0,  %%ecx \n"
-        "mov %1,  %%edx \n"
-        "int $0x80      \n"
-        :: "r"(msg), "r"(len)
-        : "eax","ebx","ecx","edx"
-    );
+        "jmp skip_data\n"
+        "message: .ascii \"[Ring3] Hello from usermode (CPL=3)!\\n\"\n"
+        "message_end:\n"
+        "skip_data:\n"
 
-    __asm__ volatile(
-        "mov $1, %%eax \n"
-        "xor %%ebx, %%ebx \n"
-        "int $0x80 \n"
-        ::: "eax","ebx"
-    );
+        "mov $4, %%eax\n"
+        "mov $1, %%ebx\n"
+        "lea message, %%ecx\n"
+        "mov $message_end - message, %%edx\n"
+        "int $0x80\n"
 
-    for(;;);
+        "mov $1, %%eax\n"
+        "xor %%ebx, %%ebx\n"
+        "int $0x80\n"
+        ::: "eax", "ebx", "ecx", "edx"
+    );
 }
+
 
 static Mutex shared_mutex;
 static volatile uint32_t shared_counter = 0;

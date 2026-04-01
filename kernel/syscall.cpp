@@ -5,6 +5,7 @@
 #include "vfs.h"
 #include "kstring.h"
 #include "idt.h"
+#include "paging.h"
 #include "pit.h"
 
 #define MAX_FD 32
@@ -38,8 +39,10 @@ static int32_t sys_write(uint32_t fd, uint32_t buf_addr, uint32_t len) {
     const char* buf = (const char*)buf_addr;
 
     if (fd == 1 || fd == 2) {
-        for (uint32_t i = 0; i < len; i++)
+        for (uint32_t i = 0; i < len; i++) {
+            if (!paging_is_mapped((uint32_t)&buf[i])) return -1;
             terminal_putchar(buf[i]);
+        }
         return (int32_t)len;
     }
     if (fd < MAX_FD && fd_table[fd].used) {
