@@ -3,7 +3,7 @@
 
 #define SHELL_MAX_ARGS 16
 #define SHELL_ARG_LEN 64
-#define HELP_PAGE_SIZE 18
+#define HELP_PAGE_SIZE 16
 
 struct ShellArgs {
     int argc;

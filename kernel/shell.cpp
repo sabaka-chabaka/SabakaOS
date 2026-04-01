@@ -443,7 +443,32 @@ static void cmd_spawn(const ShellArgs& args) {
     }
 }
 
-static void cmd_cow(const ShellArgs&) {
+static void cmd_dog(const ShellArgs&) {
+    terminal_puts(R"(
+      __      _
+    o'')}____//
+     `_/      )
+     (_(_/-(_/
+    )");
+}
+
+static void cmd_dogsay(const ShellArgs& args) {
+    const char* message = (args.argc > 1) ? args.argv[1] : "Woof!";
+
+    uint32_t len = kstrlen(message);
+
+    terminal_puts(" ");
+    for (int i = 0; i < len + 2; i++) terminal_puts("_");
+    terminal_puts("\n");
+
+    terminal_puts("< ");
+    terminal_puts(message);
+    terminal_puts(" >\n");
+
+    terminal_puts(" ");
+    for (int i = 0; i < len + 2; i++) terminal_puts(" ");
+    terminal_puts(" ");
+
     terminal_puts(R"(
       __      _
     o'')}____//
@@ -473,7 +498,8 @@ void shell_init() {
     shell_register("spawn",   "spawn <name>",              cmd_spawn);
     shell_register("kill",    "kill <pid>",                cmd_kill);
     shell_register("ps",      "List processes",            cmd_ps);
-    shell_register("cow",     "Shows a cow",               cmd_cow);
+    shell_register("dog",     "Shows a dog",               cmd_dog);
+    shell_register("dogsay",  "dogsay <message>",          cmd_dogsay);
 }
 
 void shell_execute(const char* line) {
