@@ -478,11 +478,11 @@ static void cmd_dogsay(const ShellArgs& args) {
 }
 
 void shell_init() {
-    shell_register("help",    "Show this help",           cmd_help);
-    shell_register("clear",   "Clear terminal",           cmd_clear);
-    shell_register("echo",    "Print arguments",          cmd_echo);
-    shell_register("mem",     "Memory statistics",        cmd_mem);
-    shell_register("version", "OS version info",          cmd_version);
+    shell_register("help",    "Show this help",            cmd_help);
+    shell_register("clear",   "Clear terminal",            cmd_clear);
+    shell_register("echo",    "Print arguments",           cmd_echo);
+    shell_register("mem",     "Memory statistics",         cmd_mem);
+    shell_register("version", "OS version info",           cmd_version);
     shell_register("ls",      "List directory",            cmd_ls);
     shell_register("pwd",     "Print working directory",   cmd_pwd);
     shell_register("cd",      "Change directory",          cmd_cd);
