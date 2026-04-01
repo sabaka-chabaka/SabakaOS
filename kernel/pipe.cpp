@@ -29,7 +29,7 @@ int pipe_create() {
 }
 
 void pipe_destroy(int id) {
-    if (id < 0 | id >= PIPE_MAX) return;
+    if (id < 0 || id >= PIPE_MAX) return;
     pipes[id].used = false;
 }
 
