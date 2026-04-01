@@ -4,7 +4,6 @@
 #include "pmm.h"
 #include "paging.h"
 #include "heap.h"
-#include "kstring.h"
 #include "terminal.h"
 #include "shell.h"
 #include "pit.h"
@@ -35,7 +34,7 @@ static void vga_fill(char c, int row, unsigned char fg, unsigned char bg=0) {
 #define USER_CODE_VIRT 0x20000000u
 #define USER_CODE_SIZE 4096u
 
-__attribute__((section(".user_text"), noinline))
+/*__attribute__((section(".user_text"), noinline))
 static void user_hello_proc() {
     __asm__ volatile(
         "jmp skip_data\n"
@@ -78,7 +77,7 @@ static void user_hello_proc() {
         "int $0x80\n"
         ::: "eax", "ebx", "ecx", "edx", "esi"
     );
-}
+}*/
 
 
 static Mutex shared_mutex;
@@ -104,7 +103,7 @@ static void mutex_proc_b(void*) {
     process_exit();
 }
 
-static void pipe_producer(void* arg) {
+/*static void pipe_producer(void* arg) {
     int pipe_id = (int)(uintptr_t)arg;
     const char* msgs[] = { "hello", "from", "pipe", nullptr };
     for (int i = 0; msgs[i]; i++) {
@@ -127,7 +126,7 @@ static void pipe_consumer(void* arg) {
     }
     pipe_destroy(pipe_id);
     process_exit();
-}
+}*/
 
 extern "C" void kernel_main() {
     for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
@@ -155,40 +154,25 @@ extern "C" void kernel_main() {
 
     scheduler_init();
 
-    /* ---- Spawn Ring-0 kernel processes ---- */
     process_create(mutex_proc_a, nullptr, "mutex_a",   5);
     process_create(mutex_proc_b, nullptr, "mutex_b",   5);
 
     int pipe_id = pipe_create();
     if (pipe_id >= 0) {
-        process_create(pipe_producer, (void*)(uintptr_t)pipe_id, "pipe_prod", 5);
-        process_create(pipe_consumer, (void*)(uintptr_t)pipe_id, "pipe_cons", 5);
+        //process_create(pipe_producer, (void*)(uintptr_t)pipe_id, "pipe_prod", 5);
+        //process_create(pipe_consumer, (void*)(uintptr_t)pipe_id, "pipe_cons", 5);
     }
 
-    /* ---- Spawn Ring-3 usermode process ----
-     *
-     * 1. Allocate a PAGE_USER page at USER_CODE_VIRT.
-     * 2. Copy the user_hello_proc() machine code there.
-     * 3. Create the process with process_create_user().
-     *
-     * Copying the code is necessary because the original function lives in
-     * the kernel's .text section which is NOT mapped PAGE_USER — attempting
-     * to execute it at CPL=3 would cause a #PF (protection fault).
-     */
-    if (paging_alloc_region(USER_CODE_VIRT, USER_CODE_SIZE,
-                            PAGE_PRESENT | PAGE_WRITE | PAGE_USER)) {
-        /* Copy function bytes to user page.
-           We assume user_hello_proc() fits in USER_CODE_SIZE (4 KB) which
-           is safe for such a tiny function. */
-        uint8_t* dst = (uint8_t*)USER_CODE_VIRT;
-        uint8_t* src = (uint8_t*)(uintptr_t)user_hello_proc;
-        for (uint32_t i = 0; i < USER_CODE_SIZE; i++)
-            dst[i] = src[i];
+    // if (paging_alloc_region(USER_CODE_VIRT, USER_CODE_SIZE,
+    //                         PAGE_PRESENT | PAGE_WRITE | PAGE_USER)) {
+    //     uint8_t* dst = (uint8_t*)USER_CODE_VIRT;
+    //     uint8_t* src = (uint8_t*)(uintptr_t)user_hello_proc;
+    //     for (uint32_t i = 0; i < USER_CODE_SIZE; i++)
+    //         dst[i] = src[i];
+    //
+    //     process_create_user(USER_CODE_VIRT, "user_hello", 5);
+    // }
 
-        process_create_user(USER_CODE_VIRT, "user_hello", 5);
-    }
-
-    /* ---- Terminal / shell ---- */
     vga_fill('-', 1, 8);
 
     terminal_init();

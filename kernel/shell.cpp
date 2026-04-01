@@ -7,6 +7,7 @@
 #include <pmm.h>
 #include <terminal.h>
 
+#include "keyboard.h"
 #include "process.h"
 #include "scheduler.h"
 
@@ -43,21 +44,55 @@ static ShellArgs parse(const char* line) {
     return args;
 }
 
-static void cmd_help(const ShellArgs&) {
-    terminal_set_color_fg(11);
-    terminal_puts("Available commands:\n");
-    terminal_reset_color();
-    for (int i = 0; i < cmd_count; i++) {
-        terminal_set_color_fg(10);
-        terminal_puts("  ");
-        terminal_puts(cmds[i].name);
+static void cmd_help(const ShellArgs& args) {
+    if (args.argc < 2) {
+        terminal_set_color_fg(11);
+        terminal_puts("Available commands (Press any key for next page):\n");
         terminal_reset_color();
-        int pad = 12 - (int)kstrlen(cmds[i].name);
-        while (pad-- > 0) terminal_putchar(' ');
-        terminal_set_color_fg(7);
-        terminal_puts(cmds[i].help);
-        terminal_reset_color();
-        terminal_newline();
+
+        int lines_printed = 0;
+
+        for (int i = 0; i < cmd_count; i++) {
+            terminal_set_color_fg(10);
+            terminal_puts("  ");
+            terminal_puts(cmds[i].name);
+            terminal_reset_color();
+
+            int pad = 12 - (int)kstrlen(cmds[i].name);
+            while (pad-- > 0) terminal_putchar(' ');
+
+            terminal_set_color_fg(7);
+            terminal_puts(cmds[i].help);
+            terminal_reset_color();
+            terminal_newline();
+
+            lines_printed++;
+
+            if (lines_printed >= HELP_PAGE_SIZE && i < cmd_count - 1) {
+                terminal_set_color_fg(14); // Yellow
+                terminal_puts("-- More (Wait 5 seconds) --\n");
+                terminal_reset_color();
+
+                pit_sleep(5);
+
+                lines_printed = 0;
+            }
+        }
+    } else {
+        for (int i = 0; i < cmd_count; i++) {
+            if (kstrcmp(cmds[i].name, args.argv[1]) == 0) {
+                terminal_set_color_fg(11);
+                terminal_puts("\nHelp for ");
+                terminal_set_color_fg(10);
+                terminal_puts(cmds[i].name);
+                terminal_reset_color();
+                terminal_puts(": ");
+                terminal_reset_color();
+                terminal_puts(cmds[i].help);
+                terminal_newline();
+                return;
+            }
+        }
     }
 }
 
@@ -406,6 +441,15 @@ static void cmd_spawn(const ShellArgs& args) {
     }
 }
 
+static void cmd_cow(const ShellArgs&) {
+    terminal_puts(R"(
+      __      _
+    o'')}____//
+     `_/      )
+     (_(_/-(_/
+    )");
+}
+
 void shell_init() {
     shell_register("help",    "Show this help",           cmd_help);
     shell_register("clear",   "Clear terminal",           cmd_clear);
@@ -421,12 +465,13 @@ void shell_init() {
     shell_register("write",   "write <file> <text>",       cmd_write);
     shell_register("uptime",  "Show system uptime",        cmd_uptime);
     shell_register("sleep",   "sleep <ms>",                cmd_sleep);
-    shell_register("reboot",  "Reboot the system",        cmd_reboot);
-    shell_register("halt",    "Halt the system",          cmd_halt);
-    shell_register("hexdump", "hexdump <addr> <size>",    cmd_hexdump);
-    shell_register("spawn", "spawn <name>",            cmd_spawn);
-    shell_register("kill",  "kill <pid>",              cmd_kill);
-    shell_register("ps",    "List processes",          cmd_ps);
+    shell_register("reboot",  "Reboot the system",         cmd_reboot);
+    shell_register("halt",    "Halt the system",           cmd_halt);
+    shell_register("hexdump", "hexdump <addr> <size>",     cmd_hexdump);
+    shell_register("spawn",   "spawn <name>",              cmd_spawn);
+    shell_register("kill",    "kill <pid>",                cmd_kill);
+    shell_register("ps",      "List processes",            cmd_ps);
+    shell_register("cow",     "Shows a cow",               cmd_cow);
 }
 
 void shell_execute(const char* line) {
