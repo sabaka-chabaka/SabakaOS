@@ -449,7 +449,7 @@ static void cmd_dog(const ShellArgs&) {
     o'')}____//
      `_/      )
      (_(_/-(_/
-    )");
+)");
 }
 
 static void cmd_dogsay(const ShellArgs& args) {
@@ -474,7 +474,7 @@ static void cmd_dogsay(const ShellArgs& args) {
     o'')}____//
      `_/      )
      (_(_/-(_/
-    )");
+)");
 }
 
 void shell_init() {
