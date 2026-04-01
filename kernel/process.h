@@ -45,6 +45,9 @@ struct Process {
     bool           is_user;
     uint32_t       user_entry;
     uint32_t       user_stack_virt;
+
+    uint32_t brk_start;
+    uint32_t brk_curr;
 };
 
 typedef void (*ProcessFunc)(void* arg);

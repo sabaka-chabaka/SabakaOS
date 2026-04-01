@@ -106,6 +106,8 @@ Process* process_create_user(uint32_t entry, const char* name, uint32_t priority
     p->sleep_until = 0;
     p->is_user     = true;
     p->user_entry  = entry;
+    p->brk_start = 0x40000000;
+    p->brk_curr  = p->brk_start;
     kstrncpy(p->name, name, PROC_NAME_LEN-1);
     p->name[PROC_NAME_LEN-1] = 0;
 

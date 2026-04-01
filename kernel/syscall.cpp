@@ -102,10 +102,31 @@ static int32_t sys_nanosleep(uint32_t timespec_addr) {
 
 static uint32_t current_brk = 0;
 static int32_t sys_brk(uint32_t addr) {
-    if (addr == 0) return (int32_t)current_brk;
-    current_brk = addr;
-    return (int32_t)current_brk;
+    Process* proc = scheduler_current();
+
+    if (addr == 0) return (int32_t)proc->brk_curr;
+
+    if (addr < proc->brk_start) return (int32_t)proc->brk_curr;
+
+    if (addr > proc->brk_curr) {
+        uint32_t old_page_end = (proc->brk_curr + 4095) & ~4095;
+        uint32_t new_page_end = (addr + 4095) & ~4095;
+
+        if (new_page_end > old_page_end) {
+            uint32_t size_to_map = new_page_end - old_page_end;
+
+            if (!paging_alloc_region(old_page_end, size_to_map,
+                                     PAGE_PRESENT | PAGE_WRITE | PAGE_USER)) {
+                return (int32_t)proc->brk_curr;
+                                     }
+        }
+    }
+
+    // 4. Обновляем границу и возвращаем её
+    proc->brk_curr = addr;
+    return (int32_t)proc->brk_curr;
 }
+
 
 static int32_t sys_mmap2(uint32_t /*addr*/, uint32_t len,
                           uint32_t /*prot*/, uint32_t /*flags*/,

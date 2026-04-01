@@ -39,20 +39,44 @@ __attribute__((section(".user_text"), noinline))
 static void user_hello_proc() {
     __asm__ volatile(
         "jmp skip_data\n"
-        "message: .ascii \"[Ring3] Hello from usermode (CPL=3)!\\n\"\n"
-        "message_end:\n"
+        "msg_ok:  .ascii \"[BRK TEST] Memory allocated and writable!\\n\"\n"
+        "msg_err: .ascii \"[BRK TEST] Failed to allocate memory...\\n\"\n"
         "skip_data:\n"
+
+        "mov $45, %%eax\n"
+        "xor %%ebx, %%ebx\n"
+        "int $0x80\n"
+        "mov %%eax, %%esi\n"
+
+        "add $4096, %%eax\n"
+        "mov %%eax, %%ebx\n"
+        "mov $45, %%eax\n"
+        "int $0x80\n"
+
+        "cmp %%esi, %%eax\n"
+        "je fail\n"
+
+        "movb $'!', (%%esi)\n"
 
         "mov $4, %%eax\n"
         "mov $1, %%ebx\n"
-        "lea message, %%ecx\n"
-        "mov $message_end - message, %%edx\n"
+        "lea msg_ok, %%ecx\n"
+        "mov $38, %%edx\n"
+        "int $0x80\n"
+        "jmp exit\n"
+
+    "fail:\n"
+        "mov $4, %%eax\n"
+        "mov $1, %%ebx\n"
+        "lea msg_err, %%ecx\n"
+        "mov $35, %%edx\n"
         "int $0x80\n"
 
+    "exit:\n"
         "mov $1, %%eax\n"
         "xor %%ebx, %%ebx\n"
         "int $0x80\n"
-        ::: "eax", "ebx", "ecx", "edx"
+        ::: "eax", "ebx", "ecx", "edx", "esi"
     );
 }
 
