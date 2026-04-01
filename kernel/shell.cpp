@@ -70,10 +70,12 @@ static void cmd_help(const ShellArgs& args) {
 
             if (lines_printed >= HELP_PAGE_SIZE && i < cmd_count - 1) {
                 terminal_set_color_fg(14); // Yellow
-                terminal_puts("-- More (Wait 5 seconds) --\n");
+                terminal_puts("-- More (Any key) --\n");
                 terminal_reset_color();
 
-                pit_sleep(5);
+                pit_sleep(1);
+
+                keyboard_wait_key();
 
                 lines_printed = 0;
             }

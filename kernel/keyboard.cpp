@@ -53,6 +53,19 @@ void keyboard_set_callback(void (*cb)(char)) {
     user_cb = cb;
 }
 
+uint32_t keyboard_wait_key() {
+    uint32_t scancode = 0;
+    while (true) {
+        while (!(inb(0x64) & 1));
+
+        scancode = inb(0x60);
+
+        if (!(scancode & 0x80)) {
+            return scancode;
+        }
+    }
+}
+
 bool keyboard_haschar() {
     return buf_head != buf_tail;
 }

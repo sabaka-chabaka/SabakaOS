@@ -8,3 +8,5 @@ char keyboard_getchar();
 bool keyboard_haschar();
 
 void keyboard_set_callback(void (*cb)(char));
+
+uint32_t keyboard_wait_key();
