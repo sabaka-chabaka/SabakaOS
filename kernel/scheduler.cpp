@@ -4,6 +4,8 @@
 #include "heap.h"
 #include "kstring.h"
 #include "pit.h"
+#include "paging.h"
+#include "usermode.h"
 
 extern "C" void context_switch(uint32_t* old_esp, uint32_t new_esp);
 
@@ -15,7 +17,12 @@ static uint32_t time_slice   = 10;
 
 static void proc_entry(Process* p, ProcessFunc func, void* arg) {
     __asm__ volatile("sti");
-    func(arg);
+    if (p->is_user) {
+        tss_set_kernel_stack(p->stack_base + PROC_STACK_SIZE);
+        enter_usermode(p->user_entry, p->user_stack_virt);
+    } else {
+        func(arg);
+    }
     process_exit();
 }
 
@@ -50,12 +57,15 @@ Process* process_create(ProcessFunc func, void* arg,
     if (!p) return nullptr;
 
     static uint32_t next_pid = 1;
-    p->pid         = next_pid++;
-    p->state       = PROC_READY;
-    p->priority    = priority;
-    p->ticks_total = 0;
-    p->ticks_slice = 0;
-    p->sleep_until = 0;
+    p->pid            = next_pid++;
+    p->state          = PROC_READY;
+    p->priority       = priority;
+    p->ticks_total    = 0;
+    p->ticks_slice    = 0;
+    p->sleep_until    = 0;
+    p->is_user        = false;
+    p->user_entry     = 0;
+    p->user_stack_virt= 0;
     kstrncpy(p->name, name, PROC_NAME_LEN-1);
     p->name[PROC_NAME_LEN-1] = 0;
 
@@ -83,13 +93,61 @@ Process* process_create(ProcessFunc func, void* arg,
     return p;
 }
 
+Process* process_create_user(uint32_t entry, const char* name, uint32_t priority) {
+    Process* p = alloc_proc();
+    if (!p) return nullptr;
+
+    static uint32_t next_pid = 1;
+    p->pid         = next_pid++;
+    p->state       = PROC_READY;
+    p->priority    = priority;
+    p->ticks_total = 0;
+    p->ticks_slice = 0;
+    p->sleep_until = 0;
+    p->is_user     = true;
+    p->user_entry  = entry;
+    kstrncpy(p->name, name, PROC_NAME_LEN-1);
+    p->name[PROC_NAME_LEN-1] = 0;
+
+    uint8_t* kstack = (uint8_t*)kmalloc(PROC_STACK_SIZE);
+    if (!kstack) { p->state = PROC_DEAD; return nullptr; }
+    p->stack_base = (uint32_t)kstack;
+
+    uint32_t ustack_virt = USER_STACK_VIRT_BASE + p->pid * PROC_USER_STACK_SIZE;
+    if (!paging_alloc_region(ustack_virt, PROC_USER_STACK_SIZE,
+                             PAGE_PRESENT | PAGE_WRITE | PAGE_USER)) {
+        kfree(kstack);
+        p->state = PROC_DEAD;
+        return nullptr;
+    }
+
+    p->user_stack_virt = ustack_virt + PROC_USER_STACK_SIZE;
+
+    uint32_t* sp = (uint32_t*)(kstack + PROC_STACK_SIZE);
+
+    *--sp = 0;
+    *--sp = 0;
+    *--sp = (uint32_t)p;
+    *--sp = 0;
+
+    *--sp = (uint32_t)proc_entry;
+
+    *--sp = 0;
+    *--sp = 0;
+    *--sp = 0;
+    *--sp = 0;
+
+    p->esp = (uint32_t)sp;
+
+    proc_count++;
+    return p;
+}
+
 void process_exit() {
     __asm__ volatile("cli");
     procs[current_idx].state = PROC_DEAD;
     proc_count--;
     scheduler_yield();
-    // Interrupts were re-enabled by scheduler_yield(); disable them now so
-    // the dead process cannot be entered again via the scheduler path.
     for(;;) __asm__ volatile("cli; hlt");
 }
 
@@ -104,8 +162,6 @@ void process_unblock(Process* p) {
 void process_sleep(uint32_t ms) {
     __asm__ volatile("cli");
     procs[current_idx].state       = PROC_SLEEP;
-    // Convert ms to PIT ticks so sleep_until is in the same unit as pit_ticks().
-    // pit_uptime_ms() uses pit_frequency, so we mirror that conversion here.
     procs[current_idx].sleep_until = pit_ticks() + (ms * pit_get_frequency()) / 1000;
     scheduler_yield();
 }
@@ -152,9 +208,7 @@ static int find_next() {
         if (procs[idx].state == PROC_READY) return idx;
     }
 
-    // Fall back to the idle/kernel process only if it is actually runnable.
     if (procs[0].state == PROC_READY || procs[0].state == PROC_RUNNING) return 0;
-    // No runnable process found — stay on current (busy-wait in idle hlt loop).
     return current_idx;
 }
 

@@ -8,6 +8,7 @@ SECTIONS
         *(.multiboot)
         *(.text)
         *(.text.*)
+        *(.user_text)
     }
 
     .rodata ALIGN(4K) : {

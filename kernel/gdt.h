@@ -31,6 +31,11 @@ struct GDTPointer {
 #define GDT_KERNEL_CODE    0x08
 #define GDT_KERNEL_DATA    0x10
 #define GDT_TSS_SEGMENT    0x18
+#define GDT_USER_CODE      0x20
+#define GDT_USER_DATA      0x28
+
+#define SEL_USER_CODE      0x23
+#define SEL_USER_DATA      0x2B
 
 void gdt_init();
 void gdt_set_tss_entry(uint32_t base, uint32_t limit);

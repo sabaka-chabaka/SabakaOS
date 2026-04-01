@@ -6,6 +6,9 @@ void     scheduler_init();
 Process* process_create(ProcessFunc func, void* arg, const char* name,
                         uint32_t priority = 5);
 
+Process* process_create_user(uint32_t entry, const char* name,
+                             uint32_t priority = 5);
+
 void     process_exit();
 
 void     process_block(Process* p);

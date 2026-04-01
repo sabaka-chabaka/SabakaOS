@@ -30,6 +30,7 @@ set(SOURCES
         kernel/tss_flush.asm
         kernel/tss.cpp
         kernel/context_switch.asm
+        kernel/usermode.cpp
         kernel/scheduler.cpp
         kernel/kernel.cpp
 )

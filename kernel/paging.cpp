@@ -3,12 +3,13 @@
 
 static uint32_t page_directory[1024] __attribute__((aligned(4096)));
 static uint32_t page_table_low[1024] __attribute__((aligned(4096)));
+static uint32_t page_table_high_kernel[1024] __attribute__((aligned(4096)));
 
 static uint32_t* get_or_create_pt(uint32_t pd_idx) {
     if (!(page_directory[pd_idx] & PAGE_PRESENT)) {
         uint32_t* pt = (uint32_t*)pmm_alloc();
         for (int i = 0; i < 1024; i++) pt[i] = 0;
-        page_directory[pd_idx] = (uint32_t)pt | PAGE_PRESENT | PAGE_WRITE;
+        page_directory[pd_idx] = (uint32_t)pt | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     }
     return (uint32_t*)(page_directory[pd_idx] & ~0xFFF);
 }
@@ -16,17 +17,26 @@ static uint32_t* get_or_create_pt(uint32_t pd_idx) {
 void paging_init() {
     for (int i = 0; i < 1024; i++) page_directory[i] = 0;
 
+    // Мапим первые 4 МБ (0.0 - 4.0 MB)
     for (uint32_t i = 0; i < 1024; i++)
         page_table_low[i] = (i * 4096) | PAGE_PRESENT | PAGE_WRITE;
 
-    page_directory[0] = (uint32_t)page_table_low | PAGE_PRESENT | PAGE_WRITE;
+    // Мапим следующие 4 МБ (4.0 - 8.0 MB) — это покроет твой адрес 0x522000
+    for (uint32_t i = 0; i < 1024; i++)
+        page_table_high_kernel[i] = (0x400000 + i * 4096) | PAGE_PRESENT | PAGE_WRITE;
 
+    // Записываем обе таблицы в каталог страниц
+    page_directory[0] = (uint32_t)page_table_low | PAGE_PRESENT | PAGE_WRITE;
+    page_directory[1] = (uint32_t)page_table_high_kernel | PAGE_PRESENT | PAGE_WRITE;
+
+    // Загружаем CR3 и включаем пейджинг
     __asm__ volatile("mov %0, %%cr3" :: "r"(page_directory));
     uint32_t cr0;
     __asm__ volatile("mov %%cr0, %0" : "=r"(cr0));
     cr0 |= 0x80000000;
     __asm__ volatile("mov %0, %%cr0" :: "r"(cr0));
 }
+
 
 void paging_map(uint32_t virt, uint32_t phys, uint32_t flags) {
     uint32_t pd_idx = virt >> 22;

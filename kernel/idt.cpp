@@ -130,6 +130,10 @@ extern "C" void isr_handler(Registers* regs) {
     pr("ESP:", 12, 20, 15); phex(regs->esp,       12, 25);
     pr("CS: ", 13, 2, 15);  phex(regs->cs,        13, 7);
     pr("EFL:", 13, 20, 15); phex(regs->eflags,    13, 25);
+    uint32_t fault_addr;
+    __asm__ volatile("mov %%cr2, %0" : "=r"(fault_addr));
+    pr("CR2:", 14, 2, 14); phex(fault_addr, 14, 7);
+
     for(;;) __asm__ volatile("cli; hlt");
 }
 

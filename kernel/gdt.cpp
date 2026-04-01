@@ -1,6 +1,6 @@
 #include "gdt.h"
 
-static GDTEntry  gdt_entries[5];
+static GDTEntry  gdt_entries[7];
 static GDTPointer gdt_ptr;
 
 static void gdt_set_entry(int idx, uint32_t base, uint32_t limit,
@@ -25,7 +25,7 @@ void gdt_set_tss_entry(uint32_t base, uint32_t limit) {
 }
 
 void gdt_init() {
-    gdt_ptr.limit = sizeof(GDTEntry) * 5 - 1;
+    gdt_ptr.limit = sizeof(GDTEntry) * 7 - 1;
     gdt_ptr.base  = (uint32_t)&gdt_entries;
 
     gdt_set_entry(0, 0, 0, 0, 0);
@@ -42,7 +42,17 @@ void gdt_init() {
 
     gdt_set_entry(3, 0, 0, 0, 0);
 
-    gdt_set_entry(4, 0, 0, 0, 0);
+    gdt_set_entry(4, 0, 0xFFFFF,
+        GDT_ACCESS_PRESENT | GDT_ACCESS_RING3 |
+        GDT_ACCESS_DESCRIPTOR | GDT_ACCESS_EXECUTABLE | GDT_ACCESS_RW,
+        GDT_GRAN_4K | GDT_GRAN_32BIT | GDT_GRAN_LIMIT_HIGH);
+
+    gdt_set_entry(5, 0, 0xFFFFF,
+        GDT_ACCESS_PRESENT | GDT_ACCESS_RING3 |
+        GDT_ACCESS_DESCRIPTOR | GDT_ACCESS_RW,
+        GDT_GRAN_4K | GDT_GRAN_32BIT | GDT_GRAN_LIMIT_HIGH);
+
+    gdt_set_entry(6, 0, 0, 0, 0);
 
     gdt_flush((uint32_t)&gdt_ptr);
 }
