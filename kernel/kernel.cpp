@@ -215,9 +215,9 @@ extern "C" void kernel_main() {
     keyboard_set_callback(terminal_on_key);
 
     terminal_set_color_fg(11);
-    terminal_puts("SabakaOS v0.2.0\n");
+    terminal_puts("SabakaOS v0.3.0\n");
     terminal_reset_color();
-    terminal_puts("Ring-3 usermode (CPL=3) + syscall(int 0x80) + mutex + pipe\n");
+    terminal_puts("Persistent files | Elf executable\n");
     terminal_puts("type 'ps' to watch processes, 'help' for commands\n\n");
 
     terminal_reply_input();

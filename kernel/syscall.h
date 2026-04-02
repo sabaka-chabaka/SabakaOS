@@ -15,6 +15,8 @@
 #define SYS_FSTAT     108
 #define SYS_UNAME     122
 
+#define SYS_EXECVE    11
+
 #define SYS_SABAKA_SPAWN  300
 #define SYS_SABAKA_PS     301
 

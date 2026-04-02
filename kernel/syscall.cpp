@@ -7,6 +7,8 @@
 #include "idt.h"
 #include "paging.h"
 #include "pit.h"
+#include "elf_loader.h"
+#include "fat32.h"
 
 #define MAX_FD 32
 
@@ -159,6 +161,58 @@ static int32_t sys_uname(uint32_t buf_addr) {
     return 0;
 }
 
+static int32_t sys_execve(uint32_t path_addr, uint32_t /*argv*/, uint32_t /*envp*/) {
+    const char* path = (const char*)path_addr;
+    if (!path) return -1;
+
+    VfsNode* node = vfs_resolve_path(path);
+    if (!node || node->type != VFS_FILE) {
+        terminal_puts("[execve] file not found: ");
+        terminal_puts(path);
+        terminal_putchar('\n');
+        return -1;
+    }
+
+    if (node->data) {
+        Fat32Entry* fe = (Fat32Entry*)node->data;
+        node->size = fe->size;
+    }
+
+    if (node->size == 0) return -1;
+
+    uint8_t* buf = (uint8_t*)kmalloc(node->size);
+    if (!buf) return -1;
+
+    int r = vfs_read(node, buf, 0, node->size);
+    if (r <= 0 || (uint32_t)r != node->size) {
+        kfree(buf);
+        return -1;
+    }
+
+    ElfLoadResult elf = elf_load(buf, node->size);
+    kfree(buf);
+
+    if (!elf.ok) {
+        terminal_puts("[execve] ELF load failed\n");
+        return -1;
+    }
+
+    const char* prog_name = path;
+    for (const char* p = path; *p; p++)
+        if (*p == '/') prog_name = p + 1;
+
+    Process* proc = process_create_user(elf.entry, prog_name, 5);
+    if (!proc) {
+        terminal_puts("[execve] process_create_user failed\n");
+        return -1;
+    }
+
+    proc->brk_start = elf.load_end;
+    proc->brk_curr  = elf.load_end;
+
+    return (int32_t)proc->pid;
+}
+
 extern "C" int32_t syscall_dispatch(Registers* regs) {
     uint32_t num = regs->eax;
     uint32_t a   = regs->ebx;
@@ -177,6 +231,7 @@ extern "C" int32_t syscall_dispatch(Registers* regs) {
         case SYS_MALLOC: return sys_mmap2(a, b, c, regs->esi, regs->edi, 0);
         case SYS_FREE:   return sys_munmap(a, b);
         case SYS_UNAME:  return sys_uname(a);
+        case SYS_EXECVE: return sys_execve(a, b, c);
         default:         return -38;
     }
 }
