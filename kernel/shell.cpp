@@ -7,11 +7,13 @@
 #include <pmm.h>
 #include <terminal.h>
 
+#include "fat32.h"
 #include "keyboard.h"
 #include "process.h"
 #include "scheduler.h"
 #include "shell_disk.h"
 
+struct Fat32Entry;
 static const int CMD_MAX = 32;
 static ShellCommand cmds[CMD_MAX];
 static int cmd_count = 0;
@@ -232,6 +234,12 @@ static void cmd_cat(const ShellArgs& args) {
     VfsNode* node = vfs_resolve_path(args.argv[1]);
     if (!node) { terminal_puts("cat: no such file\n"); return; }
     if (node->type != VFS_FILE) { terminal_puts("cat: not a file\n"); return; }
+
+    if (node->data) {
+        Fat32Entry* fe = (Fat32Entry*)node->data;
+        node->size = fe->size;
+    }
+
     if (node->size == 0) return;
     uint8_t buf[VFS_MAX_FILE_DATA + 1];
     int n = vfs_read(node, buf, 0, node->size);
