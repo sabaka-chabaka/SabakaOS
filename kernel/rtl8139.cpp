@@ -175,7 +175,6 @@ void rtl8139_irq_handler() {
                 s_rx_cb(pkt + 4, rx_len - 4);
             }
 
-            // Продвигаем указатель (выравниваем по 4)
             s_rx_ptr = (s_rx_ptr + rx_len + 4 + 3) & ~3u;
             s_rx_ptr %= (32 * 1024);
 
