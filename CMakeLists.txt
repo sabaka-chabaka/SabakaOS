@@ -35,6 +35,7 @@ set(SOURCES
         kernel/kernel.cpp
         kernel/ata.cpp
         kernel/fat32.cpp
+        kernel/vfs_disk.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
