@@ -12,6 +12,7 @@
 #include "process.h"
 #include "scheduler.h"
 #include "shell_disk.h"
+#include "shell_exec.h"
 
 struct Fat32Entry;
 static const int CMD_MAX = 32;
@@ -510,6 +511,7 @@ void shell_init() {
     shell_register("dog",     "Shows a dog",               cmd_dog);
     shell_register("dogsay",  "dogsay <message>",          cmd_dogsay);
     shell_disk_register();
+    shell_exec_register();
 }
 
 void shell_execute(const char* line) {
