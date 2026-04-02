@@ -15,7 +15,9 @@
 #include "scheduler.h"
 #include "syscall.h"
 #include "mutex.h"
+#include "net.h"
 #include "pipe.h"
+#include "rtl8139.h"
 #include "vfs_disk.h"
 
 static unsigned short* const VGA = (unsigned short*)0xB8000;
@@ -79,6 +81,14 @@ extern "C" void kernel_main() {
     tss_init();
     pit_init(1000);
     vfs_init();
+
+    if (rtl8139_init()) {
+        net_init(
+            ip_from_str("10.0.2.15"),
+            ip_from_str("10.0.2.2"),
+            ip_from_str("255.255.255.0")
+        );
+    }
 
     if (ata_init()) {
         terminal_set_color_fg(10);
