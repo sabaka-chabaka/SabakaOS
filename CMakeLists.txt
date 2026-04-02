@@ -33,6 +33,7 @@ set(SOURCES
         kernel/usermode.cpp
         kernel/scheduler.cpp
         kernel/kernel.cpp
+        kernel/ata.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
@@ -53,7 +54,7 @@ target_link_options(sabakaos.bin PRIVATE
 )
 
 add_custom_target(run
-        COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -serial stdio
+        COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -serial stdio -drive file=disk.img,format=raw,index=0,media=disk
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT ">>> Запускаем SabakaOS v0.1.0..."
