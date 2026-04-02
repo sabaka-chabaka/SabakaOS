@@ -34,6 +34,7 @@ set(SOURCES
         kernel/scheduler.cpp
         kernel/kernel.cpp
         kernel/ata.cpp
+        kernel/fat32.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
