@@ -1,9 +1,12 @@
+#include "ata.h"
+#include "fat32.h"
 #include "gdt.h"
 #include "idt.h"
 #include "keyboard.h"
 #include "pmm.h"
 #include "paging.h"
 #include "heap.h"
+#include "kstring.h"
 #include "terminal.h"
 #include "shell.h"
 #include "pit.h"
@@ -13,6 +16,7 @@
 #include "syscall.h"
 #include "mutex.h"
 #include "pipe.h"
+#include "vfs_disk.h"
 
 static unsigned short* const VGA = (unsigned short*)0xB8000;
 static const int COLS = 80;
@@ -147,6 +151,36 @@ extern "C" void kernel_main() {
     tss_init();
     pit_init(1000);
     vfs_init();
+
+    if (ata_init()) {
+        terminal_set_color_fg(10);
+        terminal_puts("[ATA] Disk found, ");
+        char sec_buf[16]; kuitoa(ata_sectors_count(), sec_buf, 10);
+        terminal_puts(sec_buf);
+        terminal_puts(" sectors\n");
+        terminal_reset_color();
+
+        if (fat32_init()) {
+            if (vfs_mount_fat32("/disk")) {
+                terminal_set_color_fg(10);
+                terminal_puts("[FAT32] Mounted at /disk\n");
+                terminal_reset_color();
+            } else {
+                terminal_set_color_fg(14);
+                terminal_puts("[FAT32] VFS mount failed\n");
+                terminal_reset_color();
+            }
+        } else {
+            terminal_set_color_fg(14);
+            terminal_puts("[ATA] FAT32 not found on disk\n");
+            terminal_reset_color();
+        }
+    } else {
+        terminal_set_color_fg(14);
+        terminal_puts("[ATA] No disk detected\n");
+        terminal_reset_color();
+    }
+
     keyboard_init();
     syscall_init();
     pipe_init_all();

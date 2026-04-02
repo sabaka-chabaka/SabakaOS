@@ -10,6 +10,7 @@
 #include "keyboard.h"
 #include "process.h"
 #include "scheduler.h"
+#include "shell_disk.h"
 
 static const int CMD_MAX = 32;
 static ShellCommand cmds[CMD_MAX];
@@ -500,6 +501,7 @@ void shell_init() {
     shell_register("ps",      "List processes",            cmd_ps);
     shell_register("dog",     "Shows a dog",               cmd_dog);
     shell_register("dogsay",  "dogsay <message>",          cmd_dogsay);
+    shell_disk_register();
 }
 
 void shell_execute(const char* line) {
