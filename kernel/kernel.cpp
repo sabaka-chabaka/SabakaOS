@@ -67,7 +67,7 @@ extern "C" void kernel_main() {
     for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
 
     vga_fill(' ', 0, 15, 1);
-    vga_print("  SabakaOS v0.3.0 x86", 0, 0, 15, 1);
+    vga_print("  SabakaOS v0.4.3 x86", 0, 0, 15, 1);
 
     gdt_init();
     idt_init();
