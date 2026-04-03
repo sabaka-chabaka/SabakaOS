@@ -139,3 +139,5 @@ extern "C" void kernel_main() {
     __asm__ volatile("sti");
     for(;;) __asm__ volatile("hlt");
 }
+
+//TODO fix network
