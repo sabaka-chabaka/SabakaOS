@@ -34,11 +34,12 @@ struct PciDevice { uint8_t bus, dev, func; bool found; };
 
 static PciDevice pci_find_rtl8139() {
     PciDevice r = {0,0,0,false};
-    for (uint8_t bus = 0; bus < 8; bus++) {
+    for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t dev = 0; dev < 32; dev++) {
-            uint32_t id = pci_read(bus, dev, 0, 0);
+            uint32_t id = pci_read((uint8_t)bus, dev, 0, 0);
+            if (id == 0xFFFFFFFF) continue;
             if ((id & 0xFFFF) == RTL_VENDOR && (id >> 16) == RTL_DEVICE) {
-                r.bus = bus; r.dev = dev; r.func = 0; r.found = true;
+                r.bus = (uint8_t)bus; r.dev = dev; r.func = 0; r.found = true;
                 return r;
             }
         }
@@ -46,12 +47,18 @@ static PciDevice pci_find_rtl8139() {
     return r;
 }
 
+static uint32_t virt_to_phys(void* virt) {
+    return (uint32_t)paging_get_physaddr((uint32_t)virt);
+}
+
 static bool            s_present   = false;
 static uint16_t        s_iobase    = 0;
 static uint8_t         s_mac[6]    = {};
 static uint8_t*        s_rx_buf    = nullptr;
+static uint32_t        s_rx_phys   = 0;
 static uint32_t        s_rx_ptr    = 0;
 static uint8_t*        s_tx_buf[RTL_TX_NUM];
+static uint32_t        s_tx_phys[RTL_TX_NUM];
 static uint8_t         s_tx_slot   = 0;
 static rtl_rx_callback s_rx_cb     = nullptr;
 
@@ -65,16 +72,16 @@ bool rtl8139_init() {
     }
 
     uint32_t cmd = pci_read(pci.bus, pci.dev, pci.func, 0x04);
-    cmd |= 0x05;
+    cmd |= 0x07;
     pci_write(pci.bus, pci.dev, pci.func, 0x04, cmd);
 
     uint32_t bar0 = pci_read(pci.bus, pci.dev, pci.func, 0x10);
     s_iobase = (uint16_t)(bar0 & ~3u);
 
-    outb(s_iobase + 0x52, 0x00);
+    outb(s_iobase + RTL_REG_CONFIG1, 0x00);
 
     outb(s_iobase + RTL_REG_CHIPCMD, RTL_CMD_RESET);
-    for (int i = 0; i < 100000; i++) {
+    for (int i = 0; i < 1000000; i++) {
         if (!(inb(s_iobase + RTL_REG_CHIPCMD) & RTL_CMD_RESET)) break;
     }
 
@@ -84,27 +91,41 @@ bool rtl8139_init() {
     s_rx_buf = (uint8_t*)kmalloc(RTL_RX_BUF_SIZE);
     if (!s_rx_buf) return false;
     kmemset(s_rx_buf, 0, RTL_RX_BUF_SIZE);
+    s_rx_phys = virt_to_phys(s_rx_buf);
+    if (!s_rx_phys) {
+        terminal_puts("[RTL8139] ERROR: RX buf phys addr = 0\n");
+        return false;
+    }
 
     for (int i = 0; i < RTL_TX_NUM; i++) {
         s_tx_buf[i] = (uint8_t*)kmalloc(RTL_TX_BUF_SIZE);
         if (!s_tx_buf[i]) return false;
+        kmemset(s_tx_buf[i], 0, RTL_TX_BUF_SIZE);
+        s_tx_phys[i] = virt_to_phys(s_tx_buf[i]);
+        if (!s_tx_phys[i]) {
+            terminal_puts("[RTL8139] ERROR: TX buf phys addr = 0\n");
+            return false;
+        }
     }
 
-    outl(s_iobase + RTL_REG_RXBUF, (uint32_t)s_rx_buf);
+    outl(s_iobase + RTL_REG_RXBUF, s_rx_phys);
 
     outw(s_iobase + RTL_REG_INTRMASK,
-         RTL_INT_ROK | RTL_INT_RER | RTL_INT_TOK | RTL_INT_TER);
+         RTL_INT_ROK | RTL_INT_RER | RTL_INT_TOK | RTL_INT_TER |
+         RTL_INT_RXOVW | RTL_INT_FOVW);
 
     outl(s_iobase + RTL_REG_RXCONFIG,
          RTL_RX_ACCEPT_PHYS | RTL_RX_ACCEPT_BCAST |
-         RTL_RX_ACCEPT_MULTI | RTL_RX_WRAP | RTL_RX_BUFSZ_32K);
+         RTL_RX_ACCEPT_MULTI | RTL_RX_ACCEPT_ALL |
+         RTL_RX_WRAP | RTL_RX_BUFSZ_32K);
 
     outl(s_iobase + RTL_REG_TXCONFIG, 0x03000700);
 
     outb(s_iobase + RTL_REG_CHIPCMD, RTL_CMD_RX_ENABLE | RTL_CMD_TX_ENABLE);
 
-    outw(s_iobase + RTL_REG_RXBUFTAIL, 0);
-    s_rx_ptr  = 0;
+    s_rx_ptr = 0;
+    outw(s_iobase + RTL_REG_RXBUFTAIL, 0xFFF0);
+
     s_tx_slot = 0;
     s_present = true;
 
@@ -134,9 +155,11 @@ bool rtl8139_send(const uint8_t* data, uint16_t len) {
     if (!s_present || len > RTL_TX_BUF_SIZE) return false;
 
     uint8_t slot = s_tx_slot;
-    for (int i = 0; i < 100000; i++) {
-        uint32_t status = inl(s_iobase + RTL_REG_TXSTATUS0 + slot * 4);
-        if (!(status & RTL_TX_OWN)) break;
+
+    for (int i = 0; i < 1000000; i++) {
+        uint32_t st = inl(s_iobase + RTL_REG_TXSTATUS0 + slot * 4);
+        if (!(st & RTL_TX_OWN)) break;
+        if (st & (RTL_TX_OK | (1u<<14))) break;
     }
 
     kmemcpy(s_tx_buf[slot], data, len);
@@ -145,8 +168,8 @@ bool rtl8139_send(const uint8_t* data, uint16_t len) {
         len = 60;
     }
 
-    outl(s_iobase + RTL_REG_TXADDR0   + slot * 4, (uint32_t)s_tx_buf[slot]);
-    outl(s_iobase + RTL_REG_TXSTATUS0 + slot * 4, len & 0x1FFF);
+    outl(s_iobase + RTL_REG_TXADDR0   + slot * 4, s_tx_phys[slot]);
+    outl(s_iobase + RTL_REG_TXSTATUS0 + slot * 4, (uint32_t)len & 0x1FFF);
 
     s_tx_slot = (s_tx_slot + 1) % RTL_TX_NUM;
     return true;
@@ -158,27 +181,38 @@ void rtl8139_irq_handler() {
     uint16_t status = inw(s_iobase + RTL_REG_INTRSTATUS);
     outw(s_iobase + RTL_REG_INTRSTATUS, status);
 
+    if (status & (RTL_INT_RXOVW | RTL_INT_FOVW)) {
+        outb(s_iobase + RTL_REG_CHIPCMD, 0);
+        s_rx_ptr = 0;
+        outw(s_iobase + RTL_REG_RXBUFTAIL, 0xFFF0);
+        outb(s_iobase + RTL_REG_CHIPCMD, RTL_CMD_RX_ENABLE | RTL_CMD_TX_ENABLE);
+        return;
+    }
+
     if (status & RTL_INT_ROK) {
         while (!(inb(s_iobase + RTL_REG_CHIPCMD) & 0x01)) {
-            uint8_t* pkt = s_rx_buf + s_rx_ptr;
+            uint8_t* pkt_hdr = s_rx_buf + s_rx_ptr;
 
-            uint16_t rx_status = (uint16_t)(pkt[0] | (pkt[1] << 8));
-            uint16_t rx_len    = (uint16_t)(pkt[2] | (pkt[3] << 8));
+            uint16_t rx_status = (uint16_t)(pkt_hdr[0] | (pkt_hdr[1] << 8));
+            uint16_t rx_len    = (uint16_t)(pkt_hdr[2] | (pkt_hdr[3] << 8));
 
-            if (rx_len == 0 || rx_len > 1514 + 4) {
+            if (rx_len < 4 || rx_len > 1518 + 4) {
                 s_rx_ptr = 0;
-                outw(s_iobase + RTL_REG_RXBUFTAIL, 0);
+                outw(s_iobase + RTL_REG_RXBUFTAIL, 0xFFF0);
                 break;
             }
 
             if ((rx_status & 0x0001) && s_rx_cb) {
-                s_rx_cb(pkt + 4, rx_len - 4);
+                s_rx_cb(pkt_hdr + 4, (uint16_t)(rx_len - 4));
             }
 
             s_rx_ptr = (s_rx_ptr + rx_len + 4 + 3) & ~3u;
             s_rx_ptr %= (32 * 1024);
 
-            outw(s_iobase + RTL_REG_RXBUFTAIL, (uint16_t)(s_rx_ptr - 16));
+            uint16_t capr = (s_rx_ptr >= 16)
+                ? (uint16_t)(s_rx_ptr - 16)
+                : (uint16_t)(32*1024 - 16 + s_rx_ptr);
+            outw(s_iobase + RTL_REG_RXBUFTAIL, capr);
         }
     }
 }
