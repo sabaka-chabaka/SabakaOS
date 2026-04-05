@@ -35,6 +35,7 @@ set(SOURCES
         kernel/kernel.cpp
         kernel/ata.cpp
         kernel/net_queue.cpp
+        kernel/tcp.cpp
         kernel/fat32.cpp
         kernel/vfs_disk.cpp
         kernel/shell_disk.cpp
