@@ -1,5 +1,6 @@
 #include "net_queue.h"
 #include "tcp.h"
+#include "dns.h"
 #include "net.h"
 #include "rtl8139.h"
 #include "heap.h"
@@ -207,6 +208,17 @@ bool net_udp_send(uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
 }
 
 void net_udp_register(uint16_t port, udp_rx_callback cb) {
+    if (!cb) {
+        for (int i = 0; i < UDP_HANDLERS; i++)
+            if (s_udp_handlers[i].used && s_udp_handlers[i].port == port)
+                s_udp_handlers[i].used = false;
+        return;
+    }
+    for (int i = 0; i < UDP_HANDLERS; i++) {
+        if (s_udp_handlers[i].used && s_udp_handlers[i].port == port) {
+            s_udp_handlers[i].cb = cb; return;
+        }
+    }
     for (int i = 0; i < UDP_HANDLERS; i++) {
         if (!s_udp_handlers[i].used) {
             s_udp_handlers[i] = { port, cb, true }; return;
@@ -266,6 +278,8 @@ void net_init(uint32_t my_ip, uint32_t gateway_ip, uint32_t netmask) {
 
     netq_init(&s_pkt_queue);
     tcp_init();
+    uint32_t dns_server = htonl(ntohl(gateway_ip) + 1);
+    dns_init(dns_server);
     rtl8139_set_rx_callback(net_receive);
 
     uint8_t slirp_mac[6] = { 0x52, 0x55, 0x0A, 0x00, 0x02, 0x02 };
