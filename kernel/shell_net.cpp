@@ -1,6 +1,8 @@
 #include "shell_net.h"
 #include "net.h"
 #include "tcp.h"
+#include "dns.h"
+#include "udp_listen.h"
 #include "rtl8139.h"
 #include "terminal.h"
 #include "kstring.h"
@@ -274,6 +276,126 @@ static void cmd_tcpconnect(const ShellArgs& args) {
     terminal_puts("\n[connection closed]\n");
 }
 
+static void cmd_nslookup(const ShellArgs& args) {
+    if (args.argc < 2) { terminal_puts("Usage: nslookup <hostname>\n"); return; }
+    if (!rtl8139_present()) { print_err("nslookup: no NIC"); return; }
+
+    const char* host = args.argv[1];
+    terminal_puts("Resolving: "); terminal_puts(host); terminal_puts(" ...\n");
+
+    uint32_t ip = dns_resolve(host);
+    if (!ip) {
+        print_err("nslookup: failed (NXDOMAIN or timeout)");
+        return;
+    }
+    char ip_str[16]; ip_to_str(ip, ip_str);
+    terminal_set_color_fg(10);
+    terminal_puts(host); terminal_puts(" -> "); terminal_puts(ip_str);
+    terminal_putchar('\n');
+    terminal_reset_color();
+}
+
+static void cmd_dnscache(const ShellArgs&) {
+    int n = dns_cache_count();
+    if (n == 0) { terminal_puts("DNS cache is empty\n"); return; }
+    terminal_set_color_fg(11); terminal_puts("DNS cache:\n"); terminal_reset_color();
+    uint32_t now = pit_uptime_ms();
+    for (int i = 0; i < DNS_CACHE_SIZE; i++) {
+        const DnsCacheEntry* e = dns_cache_get(i);
+        if (!e || !e->valid) continue;
+        if (now >= e->ttl_deadline_ms) continue;
+        char ip_str[16]; ip_to_str(e->ip, ip_str);
+        terminal_puts("  "); terminal_puts(e->name);
+        terminal_puts(" -> "); terminal_puts(ip_str);
+        char tbuf[12];
+        uint32_t ttl_left = (e->ttl_deadline_ms - now) / 1000;
+        kuitoa(ttl_left, tbuf, 10);
+        terminal_puts(" (TTL "); terminal_puts(tbuf); terminal_puts("s)\n");
+    }
+}
+
+static void cmd_udplisten(const ShellArgs& args) {
+    if (args.argc < 2) {
+        terminal_puts("Usage: udplisten <port> [timeout_sec]\n");
+        return;
+    }
+    if (!rtl8139_present()) { print_err("udplisten: no NIC"); return; }
+
+    uint16_t port     = (uint16_t)katoi(args.argv[1]);
+    uint32_t timeout  = args.argc >= 3 ? (uint32_t)katoi(args.argv[2]) : 10;
+    uint32_t timeout_ms = timeout * 1000;
+
+    int handle = udpl_open(port);
+    if (handle < 0) { print_err("udplisten: no free listener slots"); return; }
+
+    terminal_set_color_fg(11);
+    terminal_puts("Listening on UDP port ");
+    char pbuf[8]; kuitoa(port, pbuf, 10); terminal_puts(pbuf);
+    terminal_puts(" (");
+    kuitoa(timeout, pbuf, 10); terminal_puts(pbuf);
+    terminal_puts("s, Ctrl+C not supported — will auto-stop)\n");
+    terminal_reset_color();
+
+    uint32_t deadline = pit_uptime_ms() + timeout_ms;
+    uint32_t count    = 0;
+
+    while (pit_uptime_ms() < deadline) {
+        UdpPacket pkt;
+        if (udpl_recv_wait(handle, &pkt, 500)) {
+            count++;
+            char src[16]; ip_to_str(pkt.src_ip, src);
+            terminal_set_color_fg(14);
+            terminal_puts("[UDP] from ");
+            terminal_puts(src); terminal_putchar(':');
+            char spbuf[8]; kuitoa(pkt.src_port, spbuf, 10);
+            terminal_puts(spbuf);
+            terminal_puts(" ("); kuitoa(pkt.len, spbuf, 10);
+            terminal_puts(spbuf); terminal_puts(" bytes): ");
+            terminal_reset_color();
+
+            // Вывод данных: печатаем как текст, непечатные — точка
+            uint16_t show = pkt.len < 128 ? pkt.len : 128;
+            for (uint16_t i = 0; i < show; i++) {
+                char c = (char)pkt.data[i];
+                terminal_putchar(c >= 32 && c < 127 ? c : '.');
+            }
+            if (pkt.len > 128) terminal_puts("...");
+            terminal_putchar('\n');
+        }
+    }
+
+    udpl_close(handle);
+    terminal_set_color_fg(10);
+    terminal_puts("[udplisten] stopped. Received ");
+    char cbuf[12]; kuitoa(count, cbuf, 10);
+    terminal_puts(cbuf); terminal_puts(" packets\n");
+    terminal_reset_color();
+}
+
+static void cmd_wgetd(const ShellArgs& args) {
+    if (args.argc < 4) {
+        terminal_puts("Usage: wgetd <hostname> <port> <path>\n");
+        terminal_puts("  Example: wgetd example.com 80 /\n");
+        return;
+    }
+    if (!rtl8139_present()) { print_err("wgetd: no NIC"); return; }
+
+    const char* host = args.argv[1];
+    uint32_t ip = dns_resolve(host);
+    if (!ip) { print_err("wgetd: DNS resolve failed"); return; }
+
+    char ip_str[16]; ip_to_str(ip, ip_str);
+    terminal_puts("Resolved "); terminal_puts(host);
+    terminal_puts(" -> "); terminal_puts(ip_str); terminal_putchar('\n');
+
+    char line[256];
+    kstrcpy(line, "wget ");
+    kstrcat(line, ip_str); kstrcat(line, " ");
+    kstrcat(line, args.argv[2]); kstrcat(line, " ");
+    kstrcat(line, args.argv[3]);
+    shell_execute(line);
+}
+
 void shell_net_register() {
     shell_register("ifconfig",   "ifconfig              Show network info",     cmd_ifconfig);
     shell_register("ping",       "ping <ip>             Send ICMP echo",        cmd_ping);
@@ -282,4 +404,8 @@ void shell_net_register() {
     shell_register("arp",        "arp                   Show ARP cache",        cmd_arp);
     shell_register("wget",       "wget <ip> <p> <path>  HTTP GET request",      cmd_wget);
     shell_register("tcpconnect", "tcpconnect <ip> <p>   Raw TCP connect+recv",  cmd_tcpconnect);
+    shell_register("nslookup",   "nslookup <host>       DNS resolve",             cmd_nslookup);
+    shell_register("dnscache",   "dnscache              Show DNS cache",           cmd_dnscache);
+    shell_register("udplisten",  "udplisten <p> [sec]   Listen on UDP port",       cmd_udplisten);
+    shell_register("wgetd",      "wgetd <host> <p> <path> HTTP GET with DNS",     cmd_wgetd);
 }
