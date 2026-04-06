@@ -1,8 +1,12 @@
+#include "net_queue.h"
+#include "tcp.h"
 #include "net.h"
 #include "rtl8139.h"
 #include "heap.h"
 #include "kstring.h"
 #include "terminal.h"
+
+static NetQueue s_pkt_queue;
 
 static uint32_t s_my_ip      = 0;
 static uint32_t s_gateway_ip = 0;
@@ -179,8 +183,6 @@ bool net_udp_send(uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
     EthHeader* eth = (EthHeader*)pkt;
     uint8_t dst_mac[6];
     if (!net_arp_lookup(next_hop, dst_mac)) {
-        // ── ФИКС: если нет ARP — шлём на broadcast.
-        // QEMU SLIRP примет пакет даже на broadcast MAC.
         kmemset(dst_mac, 0xFF, 6);
     }
     kmemcpy(eth->dst, dst_mac, 6);
@@ -222,23 +224,32 @@ static void handle_ip(const uint8_t* data, uint16_t len) {
     const uint8_t* payload = data + ihl;
     uint16_t plen = (uint16_t)(ntohs(ip->total_len) - ihl);
     switch (ip->protocol) {
-        case IP_PROTO_ICMP: handle_icmp(ip, payload, plen); break;
+        case IP_PROTO_ICMP: handle_icmp(ip, payload, plen);          break;
+        case IP_PROTO_TCP:  tcp_receive(ip->src_ip, payload, plen); break;
         case IP_PROTO_UDP:  handle_udp(ip, payload, plen);  break;
         default: break;
     }
 }
 
 void net_receive(const uint8_t* data, uint16_t len) {
-    if (len < (uint16_t)sizeof(EthHeader)) return;
-    const EthHeader* eth = (const EthHeader*)data;
-    uint16_t type = ntohs(eth->type);
-    const uint8_t* payload = data + sizeof(EthHeader);
-    uint16_t plen = (uint16_t)(len - sizeof(EthHeader));
-    switch (type) {
-        case ETH_TYPE_ARP: handle_arp(payload, plen); break;
-        case ETH_TYPE_IP:  handle_ip(payload, plen);  break;
-        default: break;
+    netq_enqueue(&s_pkt_queue, data, len);
+}
+
+void net_poll() {
+    NetPacket pkt;
+    while (netq_dequeue(&s_pkt_queue, &pkt)) {
+        if (pkt.len < (uint16_t)sizeof(EthHeader)) continue;
+        const EthHeader* eth = (const EthHeader*)pkt.data;
+        uint16_t type  = ntohs(eth->type);
+        const uint8_t* payload = pkt.data + sizeof(EthHeader);
+        uint16_t plen  = (uint16_t)(pkt.len - sizeof(EthHeader));
+        switch (type) {
+            case ETH_TYPE_ARP: handle_arp(payload, plen); break;
+            case ETH_TYPE_IP:  handle_ip(payload, plen);  break;
+            default: break;
+        }
     }
+    tcp_tick();
 }
 
 uint32_t net_get_ip() { return s_my_ip; }
@@ -253,6 +264,8 @@ void net_init(uint32_t my_ip, uint32_t gateway_ip, uint32_t netmask) {
     for (int i = 0; i < ARP_CACHE_SIZE; i++) s_arp_cache[i].valid = false;
     for (int i = 0; i < UDP_HANDLERS;   i++) s_udp_handlers[i].used = false;
 
+    netq_init(&s_pkt_queue);
+    tcp_init();
     rtl8139_set_rx_callback(net_receive);
 
     uint8_t slirp_mac[6] = { 0x52, 0x55, 0x0A, 0x00, 0x02, 0x02 };

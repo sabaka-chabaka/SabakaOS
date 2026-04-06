@@ -79,6 +79,7 @@ uint32_t net_get_ip();
 void     net_get_mac(uint8_t mac[6]);
 
 void net_receive(const uint8_t* data, uint16_t len);
+void net_poll();
 
 void net_arp_request(uint32_t target_ip);
 bool net_arp_lookup(uint32_t ip, uint8_t mac_out[6]);
