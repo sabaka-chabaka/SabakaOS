@@ -37,6 +37,7 @@ set(SOURCES
         kernel/net_queue.cpp
         kernel/tcp.cpp
         kernel/dns.cpp
+        kernel/udp_listen.cpp
         kernel/fat32.cpp
         kernel/vfs_disk.cpp
         kernel/shell_disk.cpp
