@@ -16,7 +16,7 @@
 #include "shell_net.h"
 
 struct Fat32Entry;
-static const int CMD_MAX = 32;
+static const int CMD_MAX = 64;
 static ShellCommand cmds[CMD_MAX];
 static int cmd_count = 0;
 
