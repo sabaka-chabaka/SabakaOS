@@ -90,7 +90,11 @@ extern "C" void kernel_main() {
         );
     }
 
+    bool t_init;
+
     if (ata_init()) {
+        t_init = true;
+        terminal_init();
         terminal_set_color_fg(10);
         terminal_puts("[ATA] Disk found, ");
         char sec_buf[16]; kuitoa(ata_sectors_count(), sec_buf, 10);
@@ -129,7 +133,7 @@ extern "C" void kernel_main() {
     process_create(mutex_proc_a, nullptr, "mutex_a",   5);
     process_create(mutex_proc_b, nullptr, "mutex_b",   5);
 
-    terminal_init();
+    if (!t_init) terminal_init();
     shell_init();
     terminal_set_execute_cb(shell_execute);
     keyboard_set_callback(terminal_on_key);
@@ -139,5 +143,3 @@ extern "C" void kernel_main() {
     __asm__ volatile("sti");
     for(;;) __asm__ volatile("hlt");
 }
-
-//TODO fix network
