@@ -47,6 +47,7 @@ set(SOURCES
         kernel/rtl8139.cpp
         kernel/net.cpp
         kernel/shell_net.cpp
+        kernel/env_vars.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
