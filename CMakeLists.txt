@@ -19,6 +19,7 @@ set(SOURCES
         kernel/paging.cpp
         kernel/heap.cpp
         kernel/kstring.cpp
+        kernel/math.cpp
         kernel/terminal.cpp
         kernel/syscall.cpp
         kernel/mutex.cpp
