@@ -9,6 +9,7 @@
 
 #include "fat32.h"
 #include "keyboard.h"
+#include "osmath.h"
 #include "process.h"
 #include "scheduler.h"
 #include "shell_disk.h"
@@ -488,6 +489,25 @@ static void cmd_dogsay(const ShellArgs& args) {
 )");
 }
 
+const char* u32_to_str(uint32_t value) {
+    static char buf[11];
+    int i = 10;
+
+    buf[i] = '\0';
+
+    do {
+        buf[--i] = '0' + (value % 10);
+        value /= 10;
+    } while (value);
+
+    return &buf[i];
+}
+
+static void cmd_math(const ShellArgs& args) {
+    terminal_puts(u32_to_str(evaluate(args.argv[1])));
+    terminal_newline();
+}
+
 void shell_init() {
     shell_register("help",    "Show this help",            cmd_help);
     shell_register("clear",   "Clear terminal",            cmd_clear);
@@ -511,6 +531,7 @@ void shell_init() {
     shell_register("ps",      "List processes",            cmd_ps);
     shell_register("dog",     "Shows a dog",               cmd_dog);
     shell_register("dogsay",  "dogsay <message>",          cmd_dogsay);
+    shell_register("math",    "Math operations",           cmd_math);
     shell_disk_register();
     shell_exec_register();
     shell_net_register();
