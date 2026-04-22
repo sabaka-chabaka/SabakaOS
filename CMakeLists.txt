@@ -48,6 +48,7 @@ set(SOURCES
         kernel/net.cpp
         kernel/shell_net.cpp
         kernel/env_vars.cpp
+        kernel/vesa.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
