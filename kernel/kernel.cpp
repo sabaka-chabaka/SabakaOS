@@ -19,8 +19,7 @@
 #include "pipe.h"
 #include "rtl8139.h"
 #include "vfs_disk.h"
-#include "vesa.h"
-#include "multiboot.h"
+#include "fb.h"
 
 static unsigned short* const VGA = (unsigned short*)0xB8000;
 static const int COLS = 80;
@@ -38,6 +37,9 @@ static void vga_fill(char c, int row, unsigned char fg, unsigned char bg=0) {
 
 #define HEAP_VIRT (8u * 1024u * 1024u)
 #define HEAP_SIZE (4u * 1024u * 1024u)
+
+#define USER_CODE_VIRT 0x20000000u
+#define USER_CODE_SIZE 4096u
 
 static Mutex shared_mutex;
 static volatile uint32_t shared_counter = 0;
@@ -62,46 +64,28 @@ static void mutex_proc_b(void*) {
     process_exit();
 }
 
-static void draw_vesa_header() {
-    vesa_fill_rect(0, 0, vesa_width(), 16 * 2, 0x00005A);
-    const char* title = "  SabakaOS v0.4.3 x86  [VESA " ;
-    int x = 0;
-    for (int i = 0; title[i]; i++, x += 8)
-        vesa_draw_char(x, 0, title[i], 0xFFFFFF, 0x00005A);
-    char wbuf[8], hbuf[8];
-    kuitoa((uint32_t)vesa_width(),  wbuf, 10);
-    kuitoa((uint32_t)vesa_height(), hbuf, 10);
-    for (int i = 0; wbuf[i]; i++, x += 8)
-        vesa_draw_char(x, 0, wbuf[i], 0xFFFF55, 0x00005A);
-    vesa_draw_char(x, 0, 'x', 0xFFFFFF, 0x00005A); x += 8;
-    for (int i = 0; hbuf[i]; i++, x += 8)
-        vesa_draw_char(x, 0, hbuf[i], 0xFFFF55, 0x00005A);
-    vesa_draw_char(x, 0, ']', 0xFFFFFF, 0x00005A);
-    vesa_fill_rect(0, 16, vesa_width(), 2, 0x4444AA);
-}
+extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
 
-extern "C" void kernel_main(uint32_t mb_info_ptr) {
-    const MultibootInfo* mbi = (const MultibootInfo*)mb_info_ptr;
-    if (mbi && (mbi->flags & MB_FLAG_FRAMEBUFFER) &&
-        mbi->framebuffer_type == 1 &&
-        mbi->framebuffer_bpp  == 32)
-    {
-        VesaInfo vi;
-        vi.addr   = (uint32_t)mbi->framebuffer_addr;
-        vi.pitch  = mbi->framebuffer_pitch;
-        vi.width  = mbi->framebuffer_width;
-        vi.height = mbi->framebuffer_height;
-        vi.bpp    = mbi->framebuffer_bpp;
-        vi.type   = mbi->framebuffer_type;
-        vesa_init(&vi);
-    }
+    bool have_fb = (mb_magic == 0x2BADB002) && fb_init(mb_info);
 
-    if (vesa_available()) {
-        draw_vesa_header();
+    if (have_fb) {
+        fb_fill_rect(0, 0, (int)fb_width(), 20, 0x1C1C8E);
+        fb_draw_str(4, 2, "  SabakaOS v0.4.3 x86  [VESA " , 0xFFFFFF, 0x1C1C8E);
+        char res[32];
+        uint32_t w = fb_width(), h = fb_height();
+        char ws[12], hs[12];
+        kuitoa(w, ws, 10); kuitoa(h, hs, 10);
+        int i = 0;
+        for (int j = 0; ws[j]; j++) res[i++] = ws[j];
+        res[i++] = 'x';
+        for (int j = 0; hs[j]; j++) res[i++] = hs[j];
+        res[i++] = ']'; res[i] = 0;
+        fb_draw_str(4 + 27*8, 2, res, 0xFFFF55, 0x1C1C8E);
+        fb_fill_rect(0, 20, (int)fb_width(), (int)fb_height()-20, 0x0D0D0D);
     } else {
         for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
         vga_fill(' ', 0, 15, 1);
-        vga_print("  SabakaOS v0.4.3 x86", 0, 0, 15, 1);
+        vga_print("  SabakaOS v0.4.3 x86 [VGA text]", 0, 0, 15, 1);
     }
 
     gdt_init();
@@ -125,7 +109,7 @@ extern "C" void kernel_main(uint32_t mb_info_ptr) {
         );
     }
 
-    bool t_init = false;
+    bool t_init;
 
     if (ata_init()) {
         t_init = true;

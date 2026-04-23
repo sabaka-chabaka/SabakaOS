@@ -48,9 +48,8 @@ set(SOURCES
         kernel/net.cpp
         kernel/shell_net.cpp
         kernel/env_vars.cpp
-        kernel/vesa.cpp
+        kernel/fb.cpp
 )
-
 add_executable(sabakaos.bin ${SOURCES})
 target_include_directories(sabakaos.bin PRIVATE kernel)
 
@@ -69,8 +68,15 @@ target_link_options(sabakaos.bin PRIVATE
 )
 
 add_custom_target(run
-        COMMAND qemu-system-i386 -kernel sabakaos.bin -m 32M -serial stdio -drive file=disk.img,format=raw,index=0,media=disk -netdev user,id=net0 -device rtl8139,netdev=net0
+        COMMAND qemu-system-i386
+        -kernel sabakaos.bin
+        -m 64M
+        -serial stdio
+        -drive file=disk.img,format=raw,index=0,media=disk
+        -netdev user,id=net0
+        -device rtl8139,netdev=net0
+        -vga std
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT ">>> Запускаем SabakaOS v0.1.0..."
+        COMMENT ">>> Starting SabakaOS with VESA Framebuffer..."
 )
