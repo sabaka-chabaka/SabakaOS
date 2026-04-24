@@ -32,38 +32,56 @@ struct MultibootInfo {
 } __attribute__((packed));
 
 bool fb_init(const MultibootInfo* mbi);
-
 bool fb_available();
 
 uint32_t fb_width();
 uint32_t fb_height();
+uint8_t  fb_bpp();
 
-void fb_put_pixel(int x, int y, uint32_t rgb);
-void fb_fill_rect(int x, int y, int w, int h, uint32_t rgb);
-void fb_draw_char(int x, int y, char c, uint32_t fg, uint32_t bg);
-void fb_draw_str(int x, int y, const char* s, uint32_t fg, uint32_t bg);
-
-void fb_scroll(int lines);
-
-static inline uint32_t fb_rgb(uint8_t r, uint8_t g, uint8_t b) {
+static inline uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) {
     return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
 }
+static inline uint32_t rgba_blend(uint32_t fg, uint32_t bg, uint8_t alpha) {
+    uint8_t r = ((fg>>16&0xFF)*alpha + (bg>>16&0xFF)*(255-alpha)) / 255;
+    uint8_t g = ((fg>> 8&0xFF)*alpha + (bg>> 8&0xFF)*(255-alpha)) / 255;
+    uint8_t b = ((fg    &0xFF)*alpha + (bg    &0xFF)*(255-alpha)) / 255;
+    return rgb(r,g,b);
+}
 
-static const uint32_t FB_PALETTE[16] = {
-    0x000000,
-    0x0000AA,
-    0x00AA00,
-    0x00AAAA,
-    0xAA0000,
-    0xAA00AA,
-    0xAA5500,
-    0xAAAAAA,
-    0x555555,
-    0x5555FF,
-    0x55FF55,
-    0x55FFFF,
-    0xFF5555,
-    0xFF55FF,
-    0xFFFF55,
-    0xFFFFFF,
-};
+void fb_put_pixel   (int x, int y, uint32_t color);
+void fb_fill_rect   (int x, int y, int w, int h, uint32_t color);
+void fb_draw_hline  (int x, int y, int len, uint32_t color);
+void fb_draw_vline  (int x, int y, int len, uint32_t color);
+void fb_draw_rect   (int x, int y, int w, int h, uint32_t color);
+
+static const int FB_FONT_W = 8;
+static const int FB_FONT_H = 16;
+
+void fb_draw_char (int x, int y, char c,        uint32_t fg, uint32_t bg);
+void fb_draw_str  (int x, int y, const char* s, uint32_t fg, uint32_t bg);
+void fb_draw_str_transparent(int x, int y, const char* s, uint32_t fg);
+
+void fb_scroll_region(int rx, int ry, int rw, int rh, int lines, uint32_t fill_color);
+
+namespace Color {
+    static const uint32_t Black       = 0x0D0D0D;
+    static const uint32_t White       = 0xF2F2F2;
+    static const uint32_t Red         = 0xFF5555;
+    static const uint32_t Green       = 0x50FA7B;
+    static const uint32_t Yellow      = 0xF1FA8C;
+    static const uint32_t Blue        = 0xBD93F9;
+    static const uint32_t Cyan        = 0x8BE9FD;
+    static const uint32_t Magenta     = 0xFF79C6;
+    static const uint32_t Orange      = 0xFFB86C;
+    static const uint32_t Gray        = 0x44475A;
+    static const uint32_t DarkGray    = 0x282A36;
+    static const uint32_t HeaderBg    = 0x1E1E2E;
+    static const uint32_t TermBg      = 0x0D0D0D;
+    static const uint32_t Prompt      = 0x8BE9FD;
+    static const uint32_t PromptAt    = 0xF2F2F2;
+    static const uint32_t PromptHost  = 0x50FA7B;
+    static const uint32_t PromptPath  = 0x8BE9FD;
+    static const uint32_t PromptArrow = 0xBD93F9;
+    static const uint32_t Input       = 0xF2F2F2;
+    static const uint32_t Cursor      = 0xF1FA8C;
+}
