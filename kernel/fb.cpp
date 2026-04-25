@@ -105,7 +105,62 @@ static uint32_t s_height   = 0;
 static uint8_t  s_bpp      = 0;
 static bool     s_ready    = false;
 
+static inline void bga_write(uint16_t index, uint16_t value) {
+    __asm__ volatile("outw %0,%1"::"a"(index),"Nd"((uint16_t)0x01CE));
+    __asm__ volatile("outw %0,%1"::"a"(value),"Nd"((uint16_t)0x01CF));
+}
+static inline uint16_t bga_read(uint16_t index) {
+    __asm__ volatile("outw %0,%1"::"a"(index),"Nd"((uint16_t)0x01CE));
+    uint16_t v; __asm__ volatile("inw %1,%0":"=a"(v):"Nd"((uint16_t)0x01CF));
+    return v;
+}
+static bool bga_detect() {
+    uint16_t id = bga_read(0);
+    return (id >= 0xB0C0 && id <= 0xB0CF);
+}
+static bool bga_set_mode(uint16_t w, uint16_t h, uint16_t bpp) {
+    bga_write(4, 0x00);
+    bga_write(1, w);
+    bga_write(2, h);
+    bga_write(3, bpp);
+    bga_write(6, w);
+    bga_write(7, h);
+    bga_write(8, 0);
+    bga_write(9, 0);
+    bga_write(4, 0x01 | 0x40); // ENABLED | LFB_ENABLED
+    return (bga_read(1) == w && bga_read(2) == h);
+}
+
+static uint32_t pci_find_bga_lfb() {
+    for (uint8_t bus = 0; bus < 8; bus++) {
+        for (uint8_t dev = 0; dev < 32; dev++) {
+            uint32_t addr = 0x80000000u | ((uint32_t)bus<<16) | ((uint32_t)dev<<11);
+            __asm__ volatile("outl %0,%1"::"a"(addr),"Nd"((uint16_t)0xCF8));
+            uint32_t vd; __asm__ volatile("inl %1,%0":"=a"(vd):"Nd"((uint16_t)0xCFC));
+            if (vd == 0x11111234u) {
+                __asm__ volatile("outl %0,%1"::"a"(addr|0x10),"Nd"((uint16_t)0xCF8));
+                uint32_t bar0; __asm__ volatile("inl %1,%0":"=a"(bar0):"Nd"((uint16_t)0xCFC));
+                return bar0 & 0xFFFFFFF0u;
+            }
+        }
+    }
+    return 0;
+}
+
 bool fb_init(const MultibootInfo* mbi) {
+    if (bga_detect()) {
+        if (bga_set_mode(1024, 768, 32)) {
+            uint32_t lfb = pci_find_bga_lfb();
+            if (lfb == 0) lfb = 0xE0000000u;
+            s_fb     = (uint8_t*)lfb;
+            s_width  = 1024;
+            s_height = 768;
+            s_bpp    = 32;
+            s_pitch  = 1024 * 4;
+            s_ready  = true;
+            return true;
+        }
+    }
     if (!mbi) return false;
     if (!(mbi->flags & (1u << 12))) return false;
     if (mbi->framebuffer_type == 0) return false;
@@ -114,12 +169,12 @@ bool fb_init(const MultibootInfo* mbi) {
         mbi->framebuffer_bpp != 16) return false;
     if (mbi->framebuffer_width < 320 || mbi->framebuffer_height < 200) return false;
 
-    s_fb    = (uint8_t*)(uintptr_t)mbi->framebuffer_addr;
-    s_pitch = mbi->framebuffer_pitch;
-    s_width = mbi->framebuffer_width;
-    s_height= mbi->framebuffer_height;
-    s_bpp   = mbi->framebuffer_bpp;
-    s_ready = true;
+    s_fb     = (uint8_t*)(uintptr_t)mbi->framebuffer_addr;
+    s_pitch  = mbi->framebuffer_pitch;
+    s_width  = mbi->framebuffer_width;
+    s_height = mbi->framebuffer_height;
+    s_bpp    = mbi->framebuffer_bpp;
+    s_ready  = true;
     return true;
 }
 

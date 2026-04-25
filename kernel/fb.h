@@ -31,6 +31,26 @@ struct MultibootInfo {
     uint8_t  framebuffer_type;
 } __attribute__((packed));
 
+#define VBE_DISPI_IOPORT_INDEX  0x01CE
+#define VBE_DISPI_IOPORT_DATA   0x01CF
+
+#define VBE_DISPI_INDEX_ID          0
+#define VBE_DISPI_INDEX_XRES        1
+#define VBE_DISPI_INDEX_YRES        2
+#define VBE_DISPI_INDEX_BPP         3
+#define VBE_DISPI_INDEX_ENABLE      4
+#define VBE_DISPI_INDEX_BANK        5
+#define VBE_DISPI_INDEX_VIRT_WIDTH  6
+#define VBE_DISPI_INDEX_VIRT_HEIGHT 7
+#define VBE_DISPI_INDEX_X_OFFSET    8
+#define VBE_DISPI_INDEX_Y_OFFSET    9
+
+#define VBE_DISPI_DISABLED      0x00
+#define VBE_DISPI_ENABLED       0x01
+#define VBE_DISPI_LFB_ENABLED   0x40
+
+#define BGA_LFB_PHYS_ADDR       0xE0000000
+
 bool fb_init(const MultibootInfo* mbi);
 bool fb_available();
 
@@ -41,27 +61,21 @@ uint8_t  fb_bpp();
 static inline uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) {
     return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
 }
-static inline uint32_t rgba_blend(uint32_t fg, uint32_t bg, uint8_t alpha) {
-    uint8_t r = ((fg>>16&0xFF)*alpha + (bg>>16&0xFF)*(255-alpha)) / 255;
-    uint8_t g = ((fg>> 8&0xFF)*alpha + (bg>> 8&0xFF)*(255-alpha)) / 255;
-    uint8_t b = ((fg    &0xFF)*alpha + (bg    &0xFF)*(255-alpha)) / 255;
-    return rgb(r,g,b);
-}
 
-void fb_put_pixel   (int x, int y, uint32_t color);
-void fb_fill_rect   (int x, int y, int w, int h, uint32_t color);
-void fb_draw_hline  (int x, int y, int len, uint32_t color);
-void fb_draw_vline  (int x, int y, int len, uint32_t color);
-void fb_draw_rect   (int x, int y, int w, int h, uint32_t color);
+void fb_put_pixel(int x, int y, uint32_t color);
+void fb_fill_rect(int x, int y, int w, int h, uint32_t color);
+void fb_draw_hline(int x, int y, int len, uint32_t color);
+void fb_draw_vline(int x, int y, int len, uint32_t color);
+void fb_draw_rect(int x, int y, int w, int h, uint32_t color);
 
 static const int FB_FONT_W = 8;
 static const int FB_FONT_H = 16;
 
-void fb_draw_char (int x, int y, char c,        uint32_t fg, uint32_t bg);
-void fb_draw_str  (int x, int y, const char* s, uint32_t fg, uint32_t bg);
+void fb_draw_char(int x, int y, char c,        uint32_t fg, uint32_t bg);
+void fb_draw_str (int x, int y, const char* s, uint32_t fg, uint32_t bg);
 void fb_draw_str_transparent(int x, int y, const char* s, uint32_t fg);
 
-void fb_scroll_region(int rx, int ry, int rw, int rh, int lines, uint32_t fill_color);
+void fb_scroll_region(int rx, int ry, int rw, int rh, int lines, uint32_t fill);
 
 namespace Color {
     static const uint32_t Black       = 0x0D0D0D;

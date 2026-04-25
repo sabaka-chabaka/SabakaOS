@@ -12,7 +12,6 @@ static uint32_t cur_bg = Color::Black;
 
 static int vga_row = VGA_TERM_START;
 static int vga_col = 0;
-static uint8_t vga_fg = 15, vga_bg = 0;
 
 static int fb_term_x = 0;
 static int fb_term_y = 0;
