@@ -1,4 +1,6 @@
 #include "painter.h"
+
+#include "font.h"
 #include "../kernel/kstring.h"
 
 void Painter::begin(Surface& s) {
