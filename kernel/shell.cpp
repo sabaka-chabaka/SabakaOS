@@ -243,34 +243,81 @@ static void cmd_cat(const ShellArgs& args) {
         node->size = fe->size;
     }
 
-    if (node->size == 0) return;
-    uint8_t buf[VFS_MAX_FILE_DATA + 1];
-    int n = vfs_read(node, buf, 0, node->size);
-    if (n > 0) {
+    if (node->size == 0) {
+        terminal_puts("(empty)\n");
+        return;
+    }
+
+    const uint32_t CHUNK = 512;
+    uint8_t buf[CHUNK + 1];
+    uint32_t offset = 0;
+    bool last_was_newline = false;
+    while (offset < node->size) {
+        uint32_t to_read = node->size - offset;
+        if (to_read > CHUNK) to_read = CHUNK;
+        int n = vfs_read(node, buf, offset, to_read);
+        if (n <= 0) break;
         buf[n] = 0;
         terminal_puts((char*)buf);
-        if (buf[n-1] != '\n') terminal_putchar('\n');
+        last_was_newline = (buf[n-1] == '\n');
+        offset += (uint32_t)n;
     }
+    if (!last_was_newline) terminal_putchar('\n');
 }
 
 static void cmd_write(const ShellArgs& args) {
     if (args.argc < 3) { terminal_puts("Usage: write <path> <text>\n"); return; }
+
     VfsNode* node = vfs_resolve_path(args.argv[1]);
     if (!node) {
-        node = vfs_create(vfs_cwd(), args.argv[1]);
+        const char* path = args.argv[1];
+        const char* slash = path;
+        const char* last_slash = nullptr;
+        for (const char* p = path; *p; p++)
+            if (*p == '/') last_slash = p;
+
+        VfsNode* dir = vfs_cwd();
+        const char* fname = path;
+
+        if (last_slash) {
+            char dir_path[256];
+            uint32_t dlen = (uint32_t)(last_slash - path);
+            if (dlen == 0) {
+                dir = vfs_root();
+            } else {
+                kstrncpy(dir_path, path, dlen);
+                dir_path[dlen] = 0;
+                dir = vfs_resolve_path(dir_path);
+            }
+            fname = last_slash + 1;
+        }
+
+        if (!dir) { terminal_puts("write: directory not found\n"); return; }
+        node = vfs_create(dir, fname);
         if (!node) { terminal_puts("write: cannot create file\n"); return; }
     }
     if (node->type != VFS_FILE) { terminal_puts("write: not a file\n"); return; }
     char text[VFS_MAX_FILE_DATA];
     uint32_t tlen = 0;
-    for (int i = 2; i < args.argc && tlen < VFS_MAX_FILE_DATA - 1; i++) {
-        if (i > 2 && tlen < VFS_MAX_FILE_DATA - 1) text[tlen++] = ' ';
+    for (int i = 2; i < args.argc && tlen < VFS_MAX_FILE_DATA - 2; i++) {
+        if (i > 2) text[tlen++] = ' ';
         const char* w = args.argv[i];
-        while (*w && tlen < VFS_MAX_FILE_DATA - 1) text[tlen++] = *w++;
+        while (*w && tlen < VFS_MAX_FILE_DATA - 2) text[tlen++] = *w++;
     }
+    text[tlen++] = '\n';
     text[tlen] = 0;
-    vfs_write(node, (const uint8_t*)text, 0, tlen);
-    vfs_write(node, (const uint8_t*)"\n", tlen, 1);
+
+    int written = vfs_write(node, (const uint8_t*)text, 0, tlen);
+    if (written < 0) {
+        terminal_set_color_fg(12);
+        terminal_puts("write: disk write failed\n");
+        terminal_reset_color();
+    }
+
+    if (node->data) {
+        Fat32Entry* fe = (Fat32Entry*)node->data;
+        node->size = fe->size;
+    }
 }
 
 static void cmd_reboot(const ShellArgs&) {

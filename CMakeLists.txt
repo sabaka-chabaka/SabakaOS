@@ -75,13 +75,13 @@ add_custom_target(iso
         COMMAND grub-mkrescue -o sabakaos.iso iso 2>&1
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT ">>> Building ISO with GRUB..."
+        COMMENT ">>> Собираем ISO с GRUB..."
 )
 
 add_custom_target(run
         COMMAND qemu-system-i386
-        -drive file=sabakaos.iso,format=raw,media=cdrom,index=0
-        -drive file=disk.img,format=raw,media=disk,index=1,if=ide
+        -drive file=disk.img,format=raw,if=ide,index=0,media=disk
+        -drive file=sabakaos.iso,format=raw,if=ide,index=2,media=cdrom
         -boot order=d
         -m 64M
         -serial stdio
@@ -105,7 +105,7 @@ add_custom_target(run_vga
         -vga std
         DEPENDS iso
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT ">>> Running SabakaOS (std VGA)..."
+         COMMENT ">>> Running SabakaOS (std VGA)..."
 )
 
 add_custom_target(run_novesa
