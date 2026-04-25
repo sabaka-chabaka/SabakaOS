@@ -57,6 +57,8 @@ bool fb_available();
 uint32_t fb_width();
 uint32_t fb_height();
 uint8_t  fb_bpp();
+uint32_t fb_phys_addr();
+uint32_t fb_size_bytes();
 
 static inline uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) {
     return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
@@ -76,6 +78,9 @@ void fb_draw_str (int x, int y, const char* s, uint32_t fg, uint32_t bg);
 void fb_draw_str_transparent(int x, int y, const char* s, uint32_t fg);
 
 void fb_scroll_region(int rx, int ry, int rw, int rh, int lines, uint32_t fill);
+
+uint32_t fb_phys_addr();
+uint32_t fb_size_bytes();
 
 namespace Color {
     static const uint32_t Black       = 0x0D0D0D;

@@ -26,20 +26,14 @@ static const int VGA_COLS = 80;
 static inline unsigned short ve(char c, unsigned char fg, unsigned char bg) {
     return (unsigned short)c | ((unsigned short)((bg<<4)|fg)<<8);
 }
-static void vga_cls() {
-    for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
-}
-static void vga_print(const char* s, int row, int col, unsigned char fg=15, unsigned char bg=0) {
-    for(int i=0;s[i]&&col+i<VGA_COLS;i++) VGA[row*VGA_COLS+col+i]=ve(s[i],fg,bg);
-}
+static void vga_cls() { for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0); }
 static void vga_fill_row(int row, unsigned char bg) {
     for(int i=0;i<VGA_COLS;i++) VGA[row*VGA_COLS+i]=ve(' ',15,bg);
 }
-static void vga_hex(uint32_t n, int row, int col, unsigned char fg=14) {
-    const char* h="0123456789ABCDEF";
-    char buf[11]; buf[0]='0'; buf[1]='x';
-    for(int i=0;i<8;i++) buf[2+i]=h[(n>>(28-i*4))&0xF];
-    buf[10]=0; vga_print(buf,row,col,fg);
+static void vga_print(const char* s, int row, int col,
+                      unsigned char fg=15, unsigned char bg=0) {
+    for(int i=0;s[i]&&col+i<VGA_COLS;i++)
+        VGA[row*VGA_COLS+col+i]=ve(s[i],fg,bg);
 }
 
 #define HEAP_VIRT (8u * 1024u * 1024u)
@@ -56,66 +50,53 @@ static void mutex_proc_b(void*) {
     process_exit();
 }
 
-static void draw_header_fb() {
+static void draw_header() {
     uint32_t W = fb_width(), H = fb_height();
     fb_fill_rect(0, 0, (int)W, 28, Color::HeaderBg);
     fb_draw_hline(0, 27, (int)W, Color::PromptArrow);
     fb_draw_str(8, 6, "SabakaOS", Color::PromptArrow, Color::HeaderBg);
     fb_draw_str(8 + 8*8 + 4, 6, "v0.4.3", Color::White, Color::HeaderBg);
-
     char ws[12], hs[12], bpps[4];
     kuitoa(W, ws, 10); kuitoa(H, hs, 10); kuitoa(fb_bpp(), bpps, 10);
     char res[32]; int ri=0;
-    for(int i=0;ws[i];i++) res[ri++]=ws[i];
-    res[ri++]='x';
-    for(int i=0;hs[i];i++) res[ri++]=hs[i];
-    res[ri++]=' ';
+    for(int i=0;ws[i];i++) res[ri++]=ws[i]; res[ri++]='x';
+    for(int i=0;hs[i];i++) res[ri++]=hs[i]; res[ri++]=' ';
     for(int i=0;bpps[i];i++) res[ri++]=bpps[i];
     res[ri++]='b'; res[ri++]='p'; res[ri++]='p'; res[ri]=0;
     fb_draw_str((int)W - ri*FB_FONT_W - 8, 6, res, Color::Cyan, Color::HeaderBg);
-    fb_fill_rect(0, 28, (int)W, (int)H-28, Color::Black);
+    fb_fill_rect(0, 28, (int)W, (int)H - 28, Color::Black);
+    (void)H;
 }
 
 extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
 
     vga_cls();
     vga_fill_row(0, 4);
-    vga_print("Initializing VESA...", 0, 0, 15, 4);
-
-    bool have_fb = (mb_magic == 0x2BADB002) && fb_init(mb_info);
-
-    if (have_fb) {
-        draw_header_fb();
-    } else {
-        vga_cls();
-        vga_fill_row(0, 4);
-        vga_print("FB FAILED - debug info:", 0, 0, 15, 4);
-        vga_hex(mb_magic, 1, 0);
-        vga_print("magic (need 0x2BADB002)", 1, 12, 7);
-        if (mb_info) {
-            vga_hex(mb_info->flags, 2, 0);
-            vga_print("flags (need bit12=0x1000)", 2, 12, 7);
-            vga_hex((uint32_t)mb_info->framebuffer_addr, 3, 0);
-            vga_print("fb_addr", 3, 12, 7);
-            vga_hex(mb_info->framebuffer_width, 4, 0);
-            vga_print("width", 4, 12, 7);
-            vga_hex(mb_info->framebuffer_bpp, 5, 0);
-            vga_print("bpp (16/24/32 ok)", 5, 12, 7);
-            vga_hex(mb_info->framebuffer_type, 6, 0);
-            vga_print("type (need !=0)", 6, 12, 7);
-        }
-        vga_print("Continuing in VGA text mode...", 8, 0, 14);
-        for(volatile int d=0;d<80000000;d++);
-
-        vga_cls();
-        vga_fill_row(0, 1);
-        vga_print("  SabakaOS v0.4.3 x86  [VGA text]", 0, 0, 15, 1);
-    }
+    vga_print("SabakaOS booting...", 0, 0, 15, 4);
 
     gdt_init();
     idt_init();
     pmm_init(32 * 1024 * 1024);
+
+    bool have_fb = (mb_magic == 0x2BADB002) && fb_init(mb_info);
+
     paging_init();
+
+    if (have_fb) {
+        uint32_t lfb_phys = fb_phys_addr();
+        uint32_t lfb_size = fb_size_bytes();
+        uint32_t lfb_end  = (lfb_phys + lfb_size + 0xFFF) & ~0xFFFu;
+        uint32_t lfb_base = lfb_phys & ~0xFFFu;
+        paging_map_region(lfb_base, lfb_base,
+                          lfb_end - lfb_base,
+                          PAGE_PRESENT | PAGE_WRITE);
+
+        draw_header();
+    } else {
+        vga_cls();
+        vga_fill_row(0, 1);
+        vga_print("  SabakaOS v0.4.3  [VGA text — no VESA]", 0, 0, 15, 1);
+    }
 
     bool heap_ok = paging_alloc_region(HEAP_VIRT, HEAP_SIZE, PAGE_PRESENT | PAGE_WRITE);
     if (heap_ok) heap_init(HEAP_VIRT, HEAP_SIZE);
@@ -125,24 +106,19 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
     vfs_init();
 
     if (rtl8139_init()) {
-        net_init(
-            ip_from_str("10.0.2.15"),
-            ip_from_str("10.0.2.2"),
-            ip_from_str("255.255.255.0")
-        );
+        net_init(ip_from_str("10.0.2.15"),
+                 ip_from_str("10.0.2.2"),
+                 ip_from_str("255.255.255.0"));
     }
 
-    bool t_init = false;
+    terminal_init();
+
     if (ata_init()) {
-        t_init = true;
-        terminal_init();
         terminal_set_color_fg(10);
         terminal_puts("[ATA] Disk found, ");
         char sec_buf[16]; kuitoa(ata_sectors_count(), sec_buf, 10);
-        terminal_puts(sec_buf);
-        terminal_puts(" sectors\n");
+        terminal_puts(sec_buf); terminal_puts(" sectors\n");
         terminal_reset_color();
-
         if (fat32_init()) {
             if (vfs_mount_fat32("/disk")) {
                 terminal_set_color_fg(10);
@@ -168,17 +144,14 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
     syscall_init();
     pipe_init_all();
     mutex_init(&shared_mutex);
-
     scheduler_init();
 
     process_create(mutex_proc_a, nullptr, "mutex_a", 5);
     process_create(mutex_proc_b, nullptr, "mutex_b", 5);
 
-    if (!t_init) terminal_init();
     shell_init();
     terminal_set_execute_cb(shell_execute);
     keyboard_set_callback(terminal_on_key);
-
     terminal_reply_input();
 
     __asm__ volatile("sti");

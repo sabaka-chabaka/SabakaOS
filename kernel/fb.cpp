@@ -161,6 +161,7 @@ bool fb_init(const MultibootInfo* mbi) {
             return true;
         }
     }
+
     if (!mbi) return false;
     if (!(mbi->flags & (1u << 12))) return false;
     if (mbi->framebuffer_type == 0) return false;
@@ -168,7 +169,6 @@ bool fb_init(const MultibootInfo* mbi) {
         mbi->framebuffer_bpp != 24 &&
         mbi->framebuffer_bpp != 16) return false;
     if (mbi->framebuffer_width < 320 || mbi->framebuffer_height < 200) return false;
-
     s_fb     = (uint8_t*)(uintptr_t)mbi->framebuffer_addr;
     s_pitch  = mbi->framebuffer_pitch;
     s_width  = mbi->framebuffer_width;
@@ -179,6 +179,8 @@ bool fb_init(const MultibootInfo* mbi) {
 }
 
 bool     fb_available() { return s_ready; }
+uint32_t fb_phys_addr()  { return (uint32_t)(uintptr_t)s_fb; }
+uint32_t fb_size_bytes() { return s_pitch * s_height; }
 uint32_t fb_width()     { return s_width; }
 uint32_t fb_height()    { return s_height; }
 uint8_t  fb_bpp()       { return s_bpp; }

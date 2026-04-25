@@ -68,6 +68,7 @@ static void fb_newline() {
 
 void terminal_putchar(char c) {
     if (fb_available()) {
+        if (fb_term_w == 0) return;
         fb_show_cursor(false);
         if (c == '\n') {
             fb_newline();
@@ -179,13 +180,13 @@ static void input_redraw_fb() {
         px += FB_FONT_W;
         if (px + FB_FONT_W > end_x) { px = fb_term_x; py += FB_FONT_H; }
     }
-
+    // Стереть хвост
     int erase = px;
     while (erase + FB_FONT_W <= end_x) {
         fb_fill_rect(erase, py, FB_FONT_W, FB_FONT_H, Color::Black);
         erase += FB_FONT_W;
     }
-
+    // Курсор
     fb_cx = fb_prompt_cx + input_pos * FB_FONT_W;
     fb_cy = fb_prompt_cy;
     while (fb_cx + FB_FONT_W > fb_term_w) { fb_cx -= fb_term_w; fb_cy += FB_FONT_H; }
@@ -303,8 +304,11 @@ void terminal_init() {
         fb_term_y = 28;
         fb_term_w = (int)fb_width();
         fb_term_h = (int)fb_height() - 28;
+        fb_cx = 0;
+        fb_cy = 0;
+    } else {
+        terminal_clear();
     }
-    terminal_clear();
 }
 
 void terminal_reply_input() {
