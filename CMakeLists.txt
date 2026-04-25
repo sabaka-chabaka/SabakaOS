@@ -50,6 +50,7 @@ set(SOURCES
         kernel/env_vars.cpp
         kernel/fb.cpp
         graphics/surface.cpp
+        graphics/painter.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})
