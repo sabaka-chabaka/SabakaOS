@@ -72,10 +72,10 @@ add_custom_target(iso
         COMMAND ${CMAKE_COMMAND} -E make_directory iso/boot/grub
         COMMAND ${CMAKE_COMMAND} -E copy sabakaos.bin iso/boot/sabakaos.bin
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/grub/grub.cfg iso/boot/grub/grub.cfg
-        COMMAND grub-mkrescue -o sabakaos.iso iso
+        COMMAND grub-mkrescue -o sabakaos.iso iso 2>&1
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT ">>> Собираем ISO с GRUB..."
+        COMMENT ">>> Building ISO with GRUB..."
 )
 
 add_custom_target(run
@@ -87,10 +87,25 @@ add_custom_target(run
         -serial stdio
         -netdev user,id=net0
         -device rtl8139,netdev=net0
+        -device bochs-display
+        DEPENDS iso
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT ">>> Running SabakaOS (VESA via bochs-display)..."
+)
+
+add_custom_target(run_vga
+        COMMAND qemu-system-i386
+        -drive file=sabakaos.iso,format=raw,media=cdrom,index=0
+        -drive file=disk.img,format=raw,media=disk,index=1,if=ide
+        -boot order=d
+        -m 64M
+        -serial stdio
+        -netdev user,id=net0
+        -device rtl8139,netdev=net0
         -vga std
         DEPENDS iso
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT ">>> Запускаем SabakaOS через ISO + GRUB (VESA)..."
+        COMMENT ">>> Running SabakaOS (std VGA)..."
 )
 
 add_custom_target(run_novesa
@@ -103,5 +118,5 @@ add_custom_target(run_novesa
         -device rtl8139,netdev=net0
         DEPENDS sabakaos.bin
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT ">>> Запускаем без VESA (VGA text fallback)..."
+        COMMENT ">>> Running without VESA (VGA text fallback)..."
 )

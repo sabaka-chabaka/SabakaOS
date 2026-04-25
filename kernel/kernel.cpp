@@ -33,6 +33,14 @@ static void vga_fill_row(int row, unsigned char fg, unsigned char bg=0) {
     for(int i=0;i<VGA_COLS;i++) VGA[row*VGA_COLS+i]=ve(' ',fg,bg);
 }
 
+static void vga_hex(uint32_t n, int row, int col, unsigned char fg=14, unsigned char bg=0) {
+    const char* hex = "0123456789ABCDEF";
+    char buf[11]; buf[0]='0'; buf[1]='x';
+    for(int i=0;i<8;i++) buf[2+i]=hex[(n>>(28-i*4))&0xF];
+    buf[10]=0;
+    vga_print(buf, row, col, fg, bg);
+}
+
 #define HEAP_VIRT (8u * 1024u * 1024u)
 #define HEAP_SIZE (4u * 1024u * 1024u)
 
@@ -51,13 +59,13 @@ static void mutex_proc_b(void*) {
 
 static void draw_header_fb() {
     uint32_t W = fb_width();
+    uint32_t H = fb_height();
     fb_fill_rect(0, 0, (int)W, 28, Color::HeaderBg);
     fb_draw_hline(0, 27, (int)W, Color::PromptArrow);
 
     fb_draw_str(8, 6, "SabakaOS", Color::PromptArrow, Color::HeaderBg);
     fb_draw_str(8 + 8*8 + 4, 6, "v0.4.3", Color::White, Color::HeaderBg);
 
-    uint32_t H = fb_height();
     char ws[12], hs[12], bpps[4];
     kuitoa(W, ws, 10); kuitoa(H, hs, 10); kuitoa(fb_bpp(), bpps, 10);
     char res[32]; int ri = 0;
@@ -76,7 +84,33 @@ static void draw_header_fb() {
 
 extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
 
+    for(int i=0;i<80*25;i++) VGA[i]=ve(' ',15,0);
+
+    vga_fill_row(0, 15, 4);
+    vga_print("GRUB info:", 0, 0, 15, 4);
+    vga_hex(mb_magic, 1, 0);
+    vga_print("magic", 1, 11, 7);
+    if (mb_info) {
+        vga_hex(mb_info->flags, 1, 20);
+        vga_print("flags", 1, 31, 7);
+        vga_hex((uint32_t)mb_info->framebuffer_addr, 2, 0);
+        vga_print("fb_addr", 2, 11, 7);
+        vga_hex(mb_info->framebuffer_width, 2, 20);
+        vga_print("width", 2, 31, 7);
+        vga_hex(mb_info->framebuffer_height, 3, 0);
+        vga_print("height", 3, 11, 7);
+        vga_hex(mb_info->framebuffer_bpp, 3, 20);
+        vga_print("bpp", 3, 31, 7);
+        vga_hex(mb_info->framebuffer_type, 4, 0);
+        vga_print("type(2=RGB)", 4, 11, 7);
+    } else {
+        vga_print("mb_info IS NULL!", 1, 20, 12);
+    }
+
     bool have_fb = (mb_magic == 0x2BADB002) && fb_init(mb_info);
+    vga_print(have_fb ? "FB: OK" : "FB: FAIL (VGA fallback)", 5, 0, have_fb ? 10 : 12);
+
+    for(volatile int d=0;d<50000000;d++);
 
     if (have_fb) {
         draw_header_fb();

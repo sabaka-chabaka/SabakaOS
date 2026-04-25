@@ -109,7 +109,10 @@ bool fb_init(const MultibootInfo* mbi) {
     if (!mbi) return false;
     if (!(mbi->flags & (1u << 12))) return false;
     if (mbi->framebuffer_type == 0) return false;
-    if (mbi->framebuffer_bpp != 32 && mbi->framebuffer_bpp != 24) return false;
+    if (mbi->framebuffer_bpp != 32 &&
+        mbi->framebuffer_bpp != 24 &&
+        mbi->framebuffer_bpp != 16) return false;
+    if (mbi->framebuffer_width < 320 || mbi->framebuffer_height < 200) return false;
 
     s_fb    = (uint8_t*)(uintptr_t)mbi->framebuffer_addr;
     s_pitch = mbi->framebuffer_pitch;
@@ -132,8 +135,14 @@ static inline void put(int x, int y, uint32_t color) {
     uint8_t b = (uint8_t)(color);
     if (s_bpp == 32) {
         p[0] = b; p[1] = g; p[2] = r; p[3] = 0;
-    } else { // 24
+    } else if (s_bpp == 24) {
         p[0] = b; p[1] = g; p[2] = r;
+    } else if (s_bpp == 16) {
+        uint16_t px = ((uint16_t)(r >> 3) << 11)
+                    | ((uint16_t)(g >> 2) <<  5)
+                    |  (uint16_t)(b >> 3);
+        p[0] = (uint8_t)(px & 0xFF);
+        p[1] = (uint8_t)(px >> 8);
     }
 }
 
