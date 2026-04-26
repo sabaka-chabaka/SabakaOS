@@ -50,6 +50,7 @@ set(SOURCES
         kernel/env_vars.cpp
         kernel/fb.cpp
         kernel/graphics.cpp
+        kernel/mouse.cpp
         graphics/font.cpp
         graphics/surface.cpp
         graphics/painter.cpp
