@@ -49,6 +49,7 @@ set(SOURCES
         kernel/shell_net.cpp
         kernel/env_vars.cpp
         kernel/fb.cpp
+        kernel/graphics.cpp
         graphics/font.cpp
         graphics/surface.cpp
         graphics/painter.cpp
