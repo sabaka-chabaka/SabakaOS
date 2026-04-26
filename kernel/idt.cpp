@@ -1,5 +1,6 @@
 #include "idt.h"
 #include "keyboard.h"
+#include "mouse.h"
 #include "pit.h"
 #include "rtl8139.h"
 #include "scheduler.h"
@@ -149,6 +150,7 @@ extern "C" void irq_handler(Registers* regs) {
         scheduler_tick();
     }
     if (regs->int_no == 33) keyboard_handler();
+    if (regs->int_no == 44) mouse_handler();
     if (regs->int_no == 43) rtl8139_irq_handler();
 
     if (regs->int_no >= 40) outb(0xA0, 0x20);
