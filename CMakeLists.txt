@@ -94,6 +94,7 @@ add_custom_target(run
         -netdev user,id=net0
         -device rtl8139,netdev=net0
         -device bochs-display
+        -device usb-tablet
         DEPENDS iso
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT ">>> Running SabakaOS (VESA via bochs-display)..."
