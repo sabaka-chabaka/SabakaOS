@@ -216,7 +216,7 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
                  ip_from_str("255.255.255.0"));
     }
 
-    terminal_init();
+    //terminal_init();
 
     if (ata_init()) {
         terminal_set_color_fg(10);
@@ -255,9 +255,9 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
     process_create(mutex_proc_b, nullptr, "mutex_b", 5);
 
     shell_init();
-    terminal_set_execute_cb(shell_execute);
+    //terminal_set_execute_cb(shell_execute);
     keyboard_set_callback(terminal_on_key);
-    terminal_reply_input();
+    //terminal_reply_input();
 
     __asm__ volatile("sti");
     for(;;) __asm__ volatile("hlt");
