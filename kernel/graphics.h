@@ -18,6 +18,7 @@ void win_destroy(int id);
 void win_show   (int id);
 void win_hide   (int id);
 void win_move   (int id, int x, int y);
+void win_focus  (int id);
 
 Painter& win_painter(int id);
 
