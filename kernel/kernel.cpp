@@ -21,6 +21,7 @@
 #include "vfs_disk.h"
 #include "fb.h"
 #include "graphics.h"
+#include "mouse.h"
 #include "../graphics/font.h"
 
 static unsigned short* const VGA = (unsigned short*)0xB8000;
@@ -246,6 +247,14 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
     }
 
     keyboard_init();
+
+    if (have_fb) {
+        mouse_set_callback([](const MouseState& ms) {
+            cursor_draw(ms.x, ms.y);
+        });
+        mouse_init(gfx_width(), gfx_height());
+        cursor_draw(gfx_width() / 2, gfx_height() / 2);
+    }
     syscall_init();
     pipe_init_all();
     mutex_init(&shared_mutex);

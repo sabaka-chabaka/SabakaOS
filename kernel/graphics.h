@@ -30,6 +30,9 @@ static const int TITLEBAR_H  = 28;
 static const int BORDER_W    = 1;
 static const int MAX_WINDOWS = 16;
 
+void cursor_draw(int x, int y);
+void cursor_hide();
+
 namespace WinColor {
     static const Color32 Desktop          = 0xFF0D1117;
     static const Color32 TitlebarActive   = 0xFF2D2D3F;
