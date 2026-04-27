@@ -1,6 +1,7 @@
 #include "surface.h"
 #include "../kernel/heap.h"
 #include "../kernel/kstring.h"
+#include <stddef.h>
 
 Surface surface_from_ptr(uint8_t* ptr, int w, int h, int pitch) {
     Surface s;
@@ -54,7 +55,7 @@ void surface_blit_rect(Surface& dst, int dx, int dy,
     for (int row = 0; row < sr.h; row++) {
         uint8_t* s_row = src.pixels + (sr.y + row) * src.pitch + sr.x * 4;
         uint8_t* d_row = dst.pixels + (dy  + row) * dst.pitch + dx   * 4;
-        for (int i = 0; i < row_bytes; i++) d_row[i] = s_row[i];
+        __builtin_memcpy(d_row, s_row, (size_t)row_bytes);
     }
 }
 

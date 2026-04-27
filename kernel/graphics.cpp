@@ -164,23 +164,24 @@ static int      s_cursor_py = -1;
 
 void cursor_hide() {
     if (s_cursor_px < 0) return;
-    Surface& scr = gfx_screen();
+    Surface& buf = gfx_backbuffer();
     for (int row = 0; row < CH; row++) {
         int sy = s_cursor_py + row;
-        if (sy < 0 || sy >= scr.height) continue;
-        uint32_t* line = surface_row(scr, sy);
+        if (sy < 0 || sy >= buf.height) continue;
+        uint32_t* line = surface_row(buf, sy);
         for (int col = 0; col < CW; col++) {
             int sx = s_cursor_px + col;
-            if (sx < 0 || sx >= scr.width) continue;
+            if (sx < 0 || sx >= buf.width) continue;
             line[sx] = s_cursor_bg[row * CW + col];
         }
     }
+    gfx_flip_rect(Rect(s_cursor_px, s_cursor_py, CW, CH));
     s_cursor_px = -1;
 }
 
 void cursor_draw(int x, int y) {
     cursor_hide();
-    Surface& scr = gfx_screen();
+    Surface& scr = gfx_backbuffer();
 
     for (int row = 0; row < CH; row++) {
         int sy = y + row;
@@ -207,4 +208,5 @@ void cursor_draw(int x, int y) {
     }
     s_cursor_px = x;
     s_cursor_py = y;
+    gfx_flip_rect(Rect(x, y, CW, CH));
 }
