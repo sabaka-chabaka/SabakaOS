@@ -51,6 +51,7 @@ set(SOURCES
         kernel/fb.cpp
         kernel/graphics.cpp
         kernel/mouse.cpp
+        kernel/pci.cpp
         graphics/font.cpp
         graphics/surface.cpp
         graphics/painter.cpp
