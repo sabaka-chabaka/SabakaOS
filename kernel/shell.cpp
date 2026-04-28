@@ -7,6 +7,7 @@
 #include <pmm.h>
 #include <terminal.h>
 
+#include "env_vars.h"
 #include "fat32.h"
 #include "keyboard.h"
 #include "osmath.h"
@@ -555,6 +556,19 @@ static void cmd_math(const ShellArgs& args) {
     terminal_newline();
 }
 
+static void cmd_env_set(const ShellArgs& args) {
+    env_set(args.argv[1], args.argv[2]);
+}
+
+static void cmd_env_unset(const ShellArgs& args) {
+    env_unset(args.argv[1]);
+}
+
+static void cmd_env_get(const ShellArgs& args) {
+    terminal_puts(env_get(args.argv[1]));
+    terminal_newline();
+}
+
 void shell_init() {
     shell_register("help",    "Show this help",            cmd_help);
     shell_register("clear",   "Clear terminal",            cmd_clear);
@@ -579,6 +593,9 @@ void shell_init() {
     shell_register("dog",     "Shows a dog",               cmd_dog);
     shell_register("dogsay",  "dogsay <message>",          cmd_dogsay);
     shell_register("math",    "Math operations",           cmd_math);
+    shell_register("eget",    "Get env variable",          cmd_env_get);
+    shell_register("eset",    "Set env variable",          cmd_env_set);
+    shell_register("eunset",  "Unset env variable",        cmd_env_unset);
     shell_disk_register();
     shell_exec_register();
     shell_net_register();
