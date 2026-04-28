@@ -5,6 +5,7 @@
 #include "rtl8139.h"
 #include "scheduler.h"
 #include "syscall.h"
+#include "usb/uhci.h"
 
 static IDTEntry   idt[256];
 static IDTPointer idt_ptr;
@@ -152,6 +153,9 @@ extern "C" void irq_handler(Registers* regs) {
     if (regs->int_no == 33) keyboard_handler();
     if (regs->int_no == 44) mouse_handler();
     if (regs->int_no == 43) rtl8139_irq_handler();
+
+    if (regs->int_no == 41 || regs->int_no == 42 || regs->int_no == 43)
+        uhci_irq_handler();
 
     if (regs->int_no >= 40) outb(0xA0, 0x20);
     outb(0x20, 0x20);

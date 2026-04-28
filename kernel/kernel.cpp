@@ -22,6 +22,8 @@
 #include "fb.h"
 #include "graphics.h"
 #include "mouse.h"
+#include "usb/uhci.h"
+#include "usb/hid.h"
 #include "../graphics/font.h"
 
 static unsigned short* const VGA = (unsigned short*)0xB8000;
@@ -245,6 +247,9 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
         terminal_puts("[ATA] No disk\n");
         terminal_reset_color();
     }
+
+    uhci_init();
+    hid_init();
 
     keyboard_init();
 

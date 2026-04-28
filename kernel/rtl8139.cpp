@@ -1,4 +1,5 @@
 #include "rtl8139.h"
+#include "pci.h"
 #include "paging.h"
 #include "heap.h"
 #include "kstring.h"
@@ -11,41 +12,8 @@ static inline uint8_t  inb(uint16_t port){ uint8_t  v; __asm__ volatile("inb %1,
 static inline uint16_t inw(uint16_t port){ uint16_t v; __asm__ volatile("inw %1,%0":"=a"(v):"Nd"(port)); return v; }
 static inline uint32_t inl(uint16_t port){ uint32_t v; __asm__ volatile("inl %1,%0":"=a"(v):"Nd"(port)); return v; }
 
-#define PCI_CONFIG_ADDR  0xCF8
-#define PCI_CONFIG_DATA  0xCFC
-
-static uint32_t pci_read(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off) {
-    uint32_t addr = (1u<<31) | ((uint32_t)bus<<16) | ((uint32_t)dev<<11)
-                  | ((uint32_t)func<<8) | (off & 0xFC);
-    outl(PCI_CONFIG_ADDR, addr);
-    return inl(PCI_CONFIG_DATA);
-}
-static void pci_write(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint32_t val) {
-    uint32_t addr = (1u<<31) | ((uint32_t)bus<<16) | ((uint32_t)dev<<11)
-                  | ((uint32_t)func<<8) | (off & 0xFC);
-    outl(PCI_CONFIG_ADDR, addr);
-    outl(PCI_CONFIG_DATA, val);
-}
-
 #define RTL_VENDOR  0x10EC
 #define RTL_DEVICE  0x8139
-
-struct PciDevice { uint8_t bus, dev, func; bool found; };
-
-static PciDevice pci_find_rtl8139() {
-    PciDevice r = {0,0,0,false};
-    for (uint16_t bus = 0; bus < 256; bus++) {
-        for (uint8_t dev = 0; dev < 32; dev++) {
-            uint32_t id = pci_read((uint8_t)bus, dev, 0, 0);
-            if (id == 0xFFFFFFFF) continue;
-            if ((id & 0xFFFF) == RTL_VENDOR && (id >> 16) == RTL_DEVICE) {
-                r.bus = (uint8_t)bus; r.dev = dev; r.func = 0; r.found = true;
-                return r;
-            }
-        }
-    }
-    return r;
-}
 
 static uint32_t virt_to_phys(void* virt) {
     return (uint32_t)paging_get_physaddr((uint32_t)virt);
@@ -65,18 +33,14 @@ static rtl_rx_callback s_rx_cb     = nullptr;
 bool rtl8139_init() {
     s_present = false;
 
-    PciDevice pci = pci_find_rtl8139();
+    PciDevice pci = pci_find(RTL_VENDOR, RTL_DEVICE);
     if (!pci.found) {
         terminal_puts("[RTL8139] Not found on PCI bus\n");
         return false;
     }
+    pci_enable(pci);
 
-    uint32_t cmd = pci_read(pci.bus, pci.dev, pci.func, 0x04);
-    cmd |= 0x07;
-    pci_write(pci.bus, pci.dev, pci.func, 0x04, cmd);
-
-    uint32_t bar0 = pci_read(pci.bus, pci.dev, pci.func, 0x10);
-    s_iobase = (uint16_t)(bar0 & ~3u);
+    s_iobase = (uint16_t)pci_bar_addr(pci, 0);
 
     outb(s_iobase + RTL_REG_CONFIG1, 0x00);
 
