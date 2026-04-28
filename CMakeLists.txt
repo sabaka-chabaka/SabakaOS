@@ -57,6 +57,7 @@ set(SOURCES
         graphics/painter.cpp
         graphics/gfx.cpp
         kernel/usb/uhci.cpp
+        kernel/usb/hid.cpp
 )
 
 add_executable(sabakaos.bin ${SOURCES})

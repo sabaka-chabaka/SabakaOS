@@ -29,9 +29,9 @@ bool uhci_control(
     void*    data
 );
 
-bool uchi_set_address(uint8_t new_addr);
+bool uhci_set_address(uint8_t new_addr);
 
-bool uchi_get_descriptor(uint8_t addr, uint8_t type, uint8_t idx, void* data, uint16_t len);
+bool uhci_get_descriptor(uint8_t addr, uint8_t type, uint8_t idx, void* data, uint16_t len);
 
 bool uhci_set_configuration(uint8_t addr, uint8_t config_val);
 
