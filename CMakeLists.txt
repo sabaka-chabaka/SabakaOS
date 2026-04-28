@@ -98,6 +98,7 @@ add_custom_target(run
         -device rtl8139,netdev=net0
         -device bochs-display
         -display gtk,grab-on-hover=off
+        -usb
         -device usb-kbd -device usb-tablet
         DEPENDS iso
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
