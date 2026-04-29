@@ -1,8 +1,8 @@
 #include "hid.h"
 #include "uhci.h"
 #include "../terminal.h"
+#include "../pit.h"
 #include <stddef.h>
-
 struct UsbDeviceDescriptor {
     uint8_t  bLength;
     uint8_t  bDescriptorType;
@@ -19,7 +19,6 @@ struct UsbDeviceDescriptor {
     uint8_t  iSerialNumber;
     uint8_t  bNumConfigurations;
 } __attribute__((packed));
-
 struct UsbConfigDescriptor {
     uint8_t  bLength;
     uint8_t  bDescriptorType;
@@ -30,7 +29,6 @@ struct UsbConfigDescriptor {
     uint8_t  bmAttributes;
     uint8_t  bMaxPower;
 } __attribute__((packed));
-
 struct UsbInterfaceDescriptor {
     uint8_t bLength;
     uint8_t bDescriptorType;
@@ -42,7 +40,6 @@ struct UsbInterfaceDescriptor {
     uint8_t bInterfaceProtocol;
     uint8_t iInterface;
 } __attribute__((packed));
-
 struct UsbEndpointDescriptor {
     uint8_t  bLength;
     uint8_t  bDescriptorType;
@@ -51,7 +48,6 @@ struct UsbEndpointDescriptor {
     uint16_t wMaxPacketSize;
     uint8_t  bInterval;
 } __attribute__((packed));
-
 struct UsbHidDescriptor {
     uint8_t  bLength;
     uint8_t  bDescriptorType;
@@ -61,16 +57,12 @@ struct UsbHidDescriptor {
     uint8_t  bReportDescriptorType;
     uint16_t wReportDescriptorLength;
 } __attribute__((packed));
-
 static void (*s_tablet_cb)  (const HidTabletState&)  = nullptr;
 static void (*s_keyboard_cb)(const HidKeyState&)      = nullptr;
-
 void hid_set_tablet_cb  (void (*cb)(const HidTabletState&))  { s_tablet_cb   = cb; }
 void hid_set_keyboard_cb(void (*cb)(const HidKeyState&))     { s_keyboard_cb = cb; }
-
 static void on_tablet_report(const uint8_t* data, uint8_t len) {
     if (len < 6 || !s_tablet_cb) return;
-
     HidTabletState st;
     st.buttons = data[0] & 0x07;
     st.x       = (uint16_t)(data[1] | ((uint16_t)data[2] << 8));
@@ -78,40 +70,35 @@ static void on_tablet_report(const uint8_t* data, uint8_t len) {
     st.wheel   = (int8_t)data[5];
     s_tablet_cb(st);
 }
-
 static void on_keyboard_report(const uint8_t* data, uint8_t len) {
     if (len < 8 || !s_keyboard_cb) return;
-
     HidKeyState ks;
     ks.modifier = data[0];
     for (int i = 0; i < 6; i++)
         ks.keycodes[i] = data[2 + i];
     s_keyboard_cb(ks);
 }
-
 struct FoundIface {
     uint8_t iface_num;
     uint8_t protocol;
     uint8_t endp_addr;
+    bool    endp_in;
     uint8_t max_packet;
     uint8_t interval;
 };
-
 static int parse_config(const uint8_t* buf, uint16_t total, FoundIface* out, int max_ifaces) {
     int found = 0;
     const uint8_t* p = buf;
     const uint8_t* end = buf + total;
     FoundIface cur = {};
     bool in_hid_iface = false;
-
     while (p < end && found < max_ifaces) {
         uint8_t len  = p[0];
         uint8_t type = p[1];
         if (len < 2) break;
-
         if (type == 0x04) {
             const UsbInterfaceDescriptor* ifd = (const UsbInterfaceDescriptor*)p;
-            if (ifd->bInterfaceClass == 0x03 && ifd->bInterfaceSubClass == 0x01) {
+            if (ifd->bInterfaceClass == 0x03) {
                 in_hid_iface = true;
                 cur = {};
                 cur.iface_num = ifd->bInterfaceNumber;
@@ -121,8 +108,9 @@ static int parse_config(const uint8_t* buf, uint16_t total, FoundIface* out, int
             }
         } else if (type == 0x05 && in_hid_iface) {
             const UsbEndpointDescriptor* epd = (const UsbEndpointDescriptor*)p;
-            if ((epd->bmAttributes & 0x03) == 0x03 && (epd->bEndpointAddress & 0x80)) {
+            if ((epd->bmAttributes & 0x03) == 0x03) {
                 cur.endp_addr  = epd->bEndpointAddress & 0x0F;
+                cur.endp_in    = (epd->bEndpointAddress & 0x80) != 0;
                 cur.max_packet = (uint8_t)(epd->wMaxPacketSize & 0xFF);
                 cur.interval   = epd->bInterval;
                 out[found++]   = cur;
@@ -133,30 +121,23 @@ static int parse_config(const uint8_t* buf, uint16_t total, FoundIface* out, int
     }
     return found;
 }
-
 static uint8_t s_next_addr = 1;
-
 static bool enumerate_device() {
     static uint8_t desc_buf[256];
-
     if (!uhci_get_descriptor(0, 0x01, 0, desc_buf, 8)) {
         terminal_puts("[HID] get device desc failed\n");
         return false;
     }
-
     uint8_t addr = s_next_addr++;
     if (!uhci_set_address(addr)) {
         terminal_puts("[HID] set address failed\n");
         return false;
     }
-
-    for (volatile int i = 0; i < 100000; i++);
-
+    pit_sleep_ms(10);
     if (!uhci_get_descriptor(addr, 0x01, 0, desc_buf, 18)) {
         terminal_puts("[HID] get full device desc failed\n");
         return false;
     }
-
     if (!uhci_get_descriptor(addr, 0x02, 0, desc_buf, 9)) {
         terminal_puts("[HID] get config desc failed\n");
         return false;
@@ -168,28 +149,22 @@ static bool enumerate_device() {
         return false;
     }
     uint8_t config_val = desc_buf[5];
-
     FoundIface ifaces[4];
     int n = parse_config(desc_buf, total, ifaces, 4);
     if (n == 0) {
         terminal_puts("[HID] no HID boot ifaces found\n");
         return false;
     }
-
     if (!uhci_set_configuration(addr, config_val)) {
         terminal_puts("[HID] set config failed\n");
         return false;
     }
-
     for (int i = 0; i < n; i++) {
         FoundIface& f = ifaces[i];
-
         uhci_hid_set_boot_protocol(addr, f.iface_num);
         uhci_hid_set_idle(addr, f.iface_num);
-
         UhciPollCb cb = nullptr;
         const char* type_str = "unknown";
-
         if (f.protocol == 2) {
             cb = on_tablet_report;
             type_str = "tablet/mouse";
@@ -197,24 +172,34 @@ static bool enumerate_device() {
             cb = on_keyboard_report;
             type_str = "keyboard";
         }
-
         if (cb) {
             uint8_t handle = uhci_register_interrupt(
-                addr, f.endp_addr, f.max_packet, f.interval, cb);
+                addr, f.endp_addr, f.endp_in, f.max_packet, f.interval, cb);
             if (handle) {
                 terminal_puts("[HID] registered ");
                 terminal_puts(type_str);
                 terminal_puts("\n");
             }
+        } else {
+            terminal_puts("[HID] unknown protocol, trying as tablet\n");
+            uint8_t handle = uhci_register_interrupt(
+                addr, f.endp_addr, f.endp_in, f.max_packet, f.interval, on_tablet_report);
+            if (handle) terminal_puts("[HID] registered as tablet (fallback)\n");
         }
     }
     return true;
 }
-
 bool hid_init() {
     terminal_puts("[HID] Enumerating USB devices...\n");
     bool ok = false;
-    for (int attempt = 0; attempt < 2; attempt++) {
+    for (uint8_t port = 0; port < 8; port++) {
+        if (!uhci_port_connected(port)) continue;
+        terminal_puts("[HID] Device on port ");
+        char pstr[2]; pstr[0] = (char)('0' + port); pstr[1] = 0;
+        terminal_puts(pstr);
+        terminal_puts("\n");
+        uhci_port_reset(port);
+        pit_sleep_ms(100); // Wait for device to stabilize after reset
         if (enumerate_device()) ok = true;
     }
     return ok;

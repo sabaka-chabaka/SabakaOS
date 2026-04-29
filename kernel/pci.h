@@ -12,6 +12,7 @@ uint32_t pci_read32 (uint8_t bus, uint8_t dev, uint8_t func, uint8_t off);
 void     pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint32_t val);
 
 uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off);
+void     pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint16_t val);
 uint8_t  pci_read8 (uint8_t bus, uint8_t dev, uint8_t func, uint8_t off);
 
 PciDevice pci_find(uint16_t vendor, uint16_t device_id);

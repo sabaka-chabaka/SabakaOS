@@ -51,7 +51,7 @@ void pit_sleep_ms(uint32_t ms) {
     if (ticks == 0) ticks = 1;
 
     while ((uint32_t)(pit_tick_count - start) < ticks) {
-        __asm__ volatile("sti; hlt; cli");
+        __asm__ volatile("pause");
     }
 }
 

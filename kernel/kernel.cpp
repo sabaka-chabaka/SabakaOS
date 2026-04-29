@@ -219,7 +219,7 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
                  ip_from_str("255.255.255.0"));
     }
 
-    //terminal_init();
+    terminal_init();
 
     if (ata_init()) {
         terminal_set_color_fg(10);
@@ -252,12 +252,13 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
     hid_init();
 
     keyboard_init();
+    keyboard_set_callback(terminal_on_key);
 
     if (have_fb) {
+        mouse_init(gfx_width(), gfx_height());
         mouse_set_callback([](const MouseState& ms) {
             cursor_draw(ms.x, ms.y);
         });
-        mouse_init(gfx_width(), gfx_height());
         cursor_draw(gfx_width() / 2, gfx_height() / 2);
     }
     syscall_init();
@@ -270,7 +271,7 @@ extern "C" void kernel_main(uint32_t mb_magic, MultibootInfo* mb_info) {
 
     shell_init();
     //terminal_set_execute_cb(shell_execute);
-    keyboard_set_callback(terminal_on_key);
+    //keyboard_set_callback(terminal_on_key);
     //terminal_reply_input();
 
     __asm__ volatile("sti");

@@ -32,6 +32,13 @@ void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint32_t v
     outl(PCI_DATA, val);
 }
 
+void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint16_t val) {
+    uint32_t dword = pci_read32(bus, dev, func, off & ~3u);
+    uint32_t mask = 0xFFFFu << ((off & 2) * 8);
+    dword = (dword & ~mask) | ((uint32_t)val << ((off & 2) * 8));
+    pci_write32(bus, dev, func, off & ~3u, dword);
+}
+
 uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off) {
     uint32_t dword = pci_read32(bus, dev, func, off & ~3u);
     return (uint16_t)(dword >> ((off & 2) * 8));

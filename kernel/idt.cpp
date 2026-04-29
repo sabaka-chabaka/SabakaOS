@@ -6,10 +6,8 @@
 #include "scheduler.h"
 #include "syscall.h"
 #include "usb/uhci.h"
-
 static IDTEntry   idt[256];
 static IDTPointer idt_ptr;
-
 static const char* exception_names[] = {
     "Division By Zero",    "Debug",               "NMI",
     "Breakpoint",          "Overflow",            "Bound Range Exceeded",
@@ -22,7 +20,6 @@ static const char* exception_names[] = {
     "Reserved","Reserved","Reserved","Reserved",
     "Security Exception",  "Reserved"
 };
-
 static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags) {
     idt[num].offset_low  = base & 0xFFFF;
     idt[num].offset_high = (base >> 16) & 0xFFFF;
@@ -30,7 +27,6 @@ static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags
     idt[num].zero        = 0;
     idt[num].type_attr   = flags;
 }
-
 static inline void outb(uint16_t port, uint8_t val) {
     __asm__ volatile("outb %0,%1" :: "a"(val), "Nd"(port));
 }
@@ -40,22 +36,19 @@ static inline uint8_t inb(uint16_t port) {
     return r;
 }
 static inline void io_wait() { outb(0x80, 0); }
-
 static void pic_remap() {
-    uint8_t m1 = inb(0x21), m2 = inb(0xA1);
     outb(0x20, 0x11); io_wait(); outb(0xA0, 0x11); io_wait();
     outb(0x21, 0x20); io_wait(); outb(0xA1, 0x28); io_wait();
     outb(0x21, 0x04); io_wait(); outb(0xA1, 0x02); io_wait();
     outb(0x21, 0x01); io_wait(); outb(0xA1, 0x01); io_wait();
-    outb(0x21, m1 & ~0x03); outb(0xA1, m2);
+    outb(0x21, 0x00);
+    outb(0xA1, 0x00);
 }
-
 void idt_init() {
     idt_ptr.limit = sizeof(IDTEntry) * 256 - 1;
     idt_ptr.base  = (uint32_t)&idt;
     for (int i = 0; i < 256; i++) idt_set_gate(i, 0, 0, 0);
     pic_remap();
-
     idt_set_gate(0,  (uint32_t)isr0,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(1,  (uint32_t)isr1,  0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(2,  (uint32_t)isr2,  0x08, IDT_GATE_INTERRUPT);
@@ -104,12 +97,9 @@ void idt_init() {
     idt_set_gate(45, (uint32_t)irq13, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(46, (uint32_t)irq14, 0x08, IDT_GATE_INTERRUPT);
     idt_set_gate(47, (uint32_t)irq15, 0x08, IDT_GATE_INTERRUPT);
-
     idt_set_gate(0x80, (uint32_t)isr128, 0x08, IDT_GATE_SYSCALL);
-
     idt_flush((uint32_t)&idt_ptr);
 }
-
 extern "C" void isr_handler(Registers* regs) {
     static unsigned short* const VGA = (unsigned short*)0xB8000;
     auto ve = [](char c, uint8_t fg, uint8_t bg) -> unsigned short {
@@ -136,37 +126,28 @@ extern "C" void isr_handler(Registers* regs) {
     uint32_t fault_addr;
     __asm__ volatile("mov %%cr2, %0" : "=r"(fault_addr));
     pr("CR2:", 14, 2, 14); phex(fault_addr, 14, 7);
-
     for(;;) __asm__ volatile("cli; hlt");
 }
-
 extern "C" void irq_handler(Registers* regs) {
     if (regs->int_no == 0x80) {
         regs->eax = (uint32_t)syscall_dispatch(regs);
         return;
     }
-
     if (regs->int_no == 32) {
         pit_tick();
         scheduler_tick();
     }
-    if (regs->int_no == 33) keyboard_handler();
-    if (regs->int_no == 44) mouse_handler();
     if (regs->int_no == 43) rtl8139_irq_handler();
-
-    if (regs->int_no == 41 || regs->int_no == 42 || regs->int_no == 43)
+    if (regs->int_no == (uint32_t)(32 + uhci_irq()))
         uhci_irq_handler();
-
-    if (regs->int_no >= 40) outb(0xA0, 0x20);
+    if (regs->int_no >= 40 || regs->int_no == 34) outb(0xA0, 0x20);
     outb(0x20, 0x20);
 }
-
 static void serial_write(char c)
 {
     while ((inb(0x3F8 + 5) & 0x20) == 0);
     outb(0x3F8, c);
 }
-
 void serial_write_string(const char* str)
 {
     while (*str)
